@@ -16,7 +16,7 @@
       "
       @click="$router.back()"
     >
-      <feather-icon name="chevron-left" class="w-4 h-4" />
+      <feather-icon :name="backIcon" class="w-4 h-4" />
     </a>
     <!-- Forward Button -->
     <a
@@ -28,12 +28,12 @@
       "
       @click="$router.forward()"
     >
-      <feather-icon name="chevron-right" class="w-4 h-4" />
+      <feather-icon :name="forwardIcon" class="w-4 h-4" />
     </a>
   </div>
 </template>
 <script lang="ts">
-import { shortcutsKey } from 'src/utils/injectionKeys';
+import { languageDirectionKey, shortcutsKey } from 'src/utils/injectionKeys';
 import { ref, inject } from 'vue';
 import { defineComponent } from 'vue';
 import SearchBar from './SearchBar.vue';
@@ -48,6 +48,7 @@ export default defineComponent({
       historyState,
       backlink: ref<HTMLAnchorElement | null>(null),
       shortcuts: inject(shortcutsKey),
+      languageDirection: inject(languageDirectionKey),
     };
   },
   computed: {
@@ -56,6 +57,12 @@ export default defineComponent({
     },
     hasForward() {
       return !!history.forward;
+    },
+    backIcon(): string {
+      return this.languageDirection === 'rtl' ? 'chevron-right' : 'chevron-left';
+    },
+    forwardIcon(): string {
+      return this.languageDirection === 'rtl' ? 'chevron-left' : 'chevron-right';
     },
   },
   activated() {

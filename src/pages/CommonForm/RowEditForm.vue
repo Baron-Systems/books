@@ -36,10 +36,10 @@
             :icon="true"
             @click="$emit('previous', previous)"
           >
-            <feather-icon name="chevron-left" class="w-4 h-4" />
+            <feather-icon :name="previousIcon" class="w-4 h-4" />
           </Button>
           <Button v-if="next >= 0" :icon="true" @click="$emit('next', next)">
-            <feather-icon name="chevron-right" class="w-4 h-4" />
+            <feather-icon :name="nextIcon" class="w-4 h-4" />
           </Button>
         </div>
       </div>
@@ -64,7 +64,7 @@ import { ValueError } from 'fyo/utils/errors';
 import Button from 'src/components/Button.vue';
 import FormHeader from 'src/components/FormHeader.vue';
 import TwoColumnForm from 'src/components/TwoColumnForm.vue';
-import { shortcutsKey } from 'src/utils/injectionKeys';
+import { languageDirectionKey, shortcutsKey } from 'src/utils/injectionKeys';
 import { computed } from 'vue';
 import { inject } from 'vue';
 import { defineComponent } from 'vue';
@@ -85,9 +85,22 @@ export default defineComponent({
   },
   emits: ['next', 'previous', 'close'],
   setup() {
-    return { shortcuts: inject(shortcutsKey) };
+    return {
+      shortcuts: inject(shortcutsKey),
+      languageDirection: inject(languageDirectionKey),
+    };
   },
   computed: {
+    previousIcon(): string {
+      return this.languageDirection === 'rtl'
+        ? 'chevron-right'
+        : 'chevron-left';
+    },
+    nextIcon(): string {
+      return this.languageDirection === 'rtl'
+        ? 'chevron-left'
+        : 'chevron-right';
+    },
     fieldlabel() {
       return (
         this.fyo.getField(this.doc.schemaName, this.fieldname)?.label ?? ''

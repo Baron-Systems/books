@@ -24,12 +24,8 @@
         <div
           v-else-if="Array.isArray(r.value)"
           class="
-            text-blue-600
-            dark:text-blue-100
-            bg-blue-100
-            dark:bg-blue-600
+            accent-chip
             border-white
-            dark:border-blue-600
             border
             tracking-tighter
             rounded
@@ -42,12 +38,8 @@
         <div
           v-else
           class="
-            text-pink-600
-            dark:text-pink-100
-            bg-pink-100
-            dark:bg-pink-600
+            accent-chip
             border-white
-            dark:border-pink-600
             border
             tracking-tighter
             rounded

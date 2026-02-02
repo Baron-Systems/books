@@ -97,7 +97,7 @@
         </div>
       </div>
 
-      <!-- Create Demo (Pink Icon) -->
+      <!-- Create Demo (Accent Icon) -->
       <div
         v-if="!files?.length"
         class="px-4 h-row-largest flex flex-row items-center gap-4 p-2"
@@ -113,8 +113,7 @@
             w-8
             h-8
             rounded-full
-            bg-pink-500
-            dark:bg-pink-600
+            accent-icon-bg
             relative
             flex-center
           "

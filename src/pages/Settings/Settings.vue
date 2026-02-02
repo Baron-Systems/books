@@ -22,6 +22,33 @@
 
       <!-- Section Container -->
       <div v-if="doc" class="overflow-auto custom-scroll custom-scroll-thumb1">
+        <!-- Activation status (global, stored in config) -->
+        <div
+          v-if="activeTab === ModelNameEnum.SystemSettings"
+          class="
+            p-4
+            border-b
+            dark:border-gray-800
+            bg-white
+            dark:bg-gray-890
+          "
+        >
+          <div class="flex items-center justify-between">
+            <div class="text-base font-semibold text-gray-900 dark:text-gray-25">
+              {{ 'حالة التفعيل' }}
+            </div>
+            <div
+              class="text-sm font-semibold"
+              :class="isActivated ? 'text-green-700 dark:text-green-400' : 'text-red-700 dark:text-red-400'"
+            >
+              {{ isActivated ? 'مفعل' : 'غير مفعل' }}
+            </div>
+          </div>
+          <div class="mt-1 text-sm text-gray-600 dark:text-gray-400">
+            {{ 'الأيام المتبقية:' }} <span class="font-semibold">{{ daysRemaining }}</span>
+          </div>
+        </div>
+
         <CommonFormSection
           v-for="([name, fields], idx) in activeGroup.entries()"
           :key="name + idx"
@@ -98,6 +125,7 @@ import { docsPathRef } from 'src/utils/refs';
 import { UIGroupedFields } from 'src/utils/types';
 import { computed, defineComponent, inject } from 'vue';
 import CommonFormSection from '../CommonForm/CommonFormSection.vue';
+import { applyThemeSettings } from 'src/utils/theme';
 
 const COMPONENT_NAME = 'Settings';
 
@@ -109,6 +137,7 @@ export default defineComponent({
   setup() {
     return {
       shortcuts: inject(shortcutsKey),
+      ModelNameEnum,
     };
   },
   data() {
@@ -123,6 +152,28 @@ export default defineComponent({
     };
   },
   computed: {
+    activationExpiresAt(): string | null {
+      return (
+        (this.fyo?.config?.get('license.expiresAt', null) as string | null) ??
+        null
+      );
+    },
+    isActivated(): boolean {
+      const v = this.activationExpiresAt;
+      if (!v) return false;
+      const ts = Date.parse(v);
+      if (Number.isNaN(ts)) return false;
+      return Date.now() < ts;
+    },
+    daysRemaining(): number {
+      const v = this.activationExpiresAt;
+      if (!v) return 0;
+      const ts = Date.parse(v);
+      if (Number.isNaN(ts)) return 0;
+      const ms = ts - Date.now();
+      const days = Math.ceil(ms / (24 * 60 * 60 * 1000));
+      return days > 0 ? days : 0;
+    },
     canSave() {
       return [
         ModelNameEnum.AccountingSettings,
@@ -132,10 +183,10 @@ export default defineComponent({
         ModelNameEnum.ERPNextSyncSettings,
         ModelNameEnum.PrintSettings,
         ModelNameEnum.SystemSettings,
-      ].some((s) => this.fyo.singles[s]?.canSave);
+      ].some((s) => this.fyo?.singles?.[s]?.canSave);
     },
     doc(): Doc | null {
-      const doc = this.fyo.singles[this.activeTab];
+      const doc = this.fyo?.singles?.[this.activeTab];
       if (!doc) {
         return null;
       }
@@ -155,10 +206,11 @@ export default defineComponent({
     },
     schemas(): Schema[] {
       const enableInventory =
-        !!this.fyo.singles.AccountingSettings?.enableInventory;
-      const enablePOS = !!this.fyo.singles.InventorySettings?.enablePointOfSale;
+        !!this.fyo?.singles?.AccountingSettings?.enableInventory;
+      const enablePOS =
+        !!this.fyo?.singles?.InventorySettings?.enablePointOfSale;
       const enableERPNextSync =
-        !!this.fyo.singles.AccountingSettings?.enableERPNextSync;
+        !!this.fyo?.singles?.AccountingSettings?.enableERPNextSync;
 
       return [
         ModelNameEnum.AccountingSettings,
@@ -184,7 +236,8 @@ export default defineComponent({
 
           return true;
         })
-        .map((s) => this.fyo.schemaMap[s]!);
+        .map((s) => this.fyo?.schemaMap?.[s]!)
+        .filter(Boolean);
     },
     activeGroup(): Map<string, Field[]> {
       if (!this.groupedFields) {
@@ -235,7 +288,7 @@ export default defineComponent({
   methods: {
     async reset() {
       const resetableDocs = this.schemas
-        .map(({ name }) => this.fyo.singles[name])
+        .map(({ name }) => this.fyo?.singles?.[name])
         .filter((doc) => doc?.dirty) as Doc[];
 
       for (const doc of resetableDocs) {
@@ -246,7 +299,7 @@ export default defineComponent({
     },
     async sync(): Promise<void> {
       const syncableDocs = this.schemas
-        .map(({ name }) => this.fyo.singles[name])
+        .map(({ name }) => this.fyo?.singles?.[name])
         .filter((doc) => doc?.canSave) as Doc[];
 
       for (const doc of syncableDocs) {
@@ -255,7 +308,7 @@ export default defineComponent({
 
       this.update();
       await showDialog({
-        title: this.t`Reload Frappe Books?`,
+        title: this.t`Reload Baron Accounting?`,
         detail: this.t`Changes made to settings will be visible on reload.`,
         type: 'info',
         buttons: [
@@ -294,6 +347,15 @@ export default defineComponent({
         this.errors[fieldname] = getErrorMessage(err, this.doc ?? undefined);
       }
 
+      // Live Apply theme settings (System -> Theme Settings)
+      if (this.activeTab === ModelNameEnum.SystemSettings) {
+        const doc = this.doc as unknown as Record<string, unknown> | null;
+        const liveApply = !!(doc as any)?.liveApplyTheme;
+        if (liveApply && (field.section === 'Theme Settings' || field.section === 'Theme')) {
+          applyThemeSettings(doc as any);
+        }
+      }
+
       this.update();
     },
     update(): void {
@@ -319,7 +381,7 @@ export default defineComponent({
           continue;
         }
 
-        const doc = this.fyo.singles[schemaName];
+        const doc = this.fyo?.singles?.[schemaName];
         if (evaluateHidden(field, doc)) {
           continue;
         }

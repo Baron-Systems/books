@@ -51,7 +51,7 @@
                 </p>
               </div>
               <div
-                v-show="activeCard === item.key && !isCompleted(item)"
+                v-show="activeCard === item.key"
                 class="flex mt-2 overflow-hidden"
               >
                 <Button
@@ -61,14 +61,6 @@
                   @click="handleAction(item)"
                 >
                   {{ t`Set Up` }}
-                </Button>
-                <Button
-                  v-if="item.documentation"
-                  class="leading-tight text-base"
-                  :class="{ 'ms-4': item.action }"
-                  @click="handleDocumentation(item)"
-                >
-                  {{ t`Documentation` }}
                 </Button>
               </div>
             </div>
@@ -112,17 +104,6 @@ export default defineComponent({
     await this.checkForCompletedTasks();
   },
   methods: {
-    async handleDocumentation({ key, documentation }: ListItem) {
-      if (documentation) {
-        ipc.openLink(documentation);
-      }
-
-      switch (key) {
-        case 'Opening Balances':
-          await this.updateChecks({ openingBalanceChecked: true });
-          break;
-      }
-    },
     async handleAction({ key, action }: ListItem) {
       if (action) {
         action();
@@ -160,18 +141,13 @@ export default defineComponent({
 
       if (onboardingComplete) {
         await this.updateChecks({ onboardingComplete });
-        const systemSettings = await fyo.doc.getDoc('SystemSettings');
-        await systemSettings.set('hideGetStarted', true);
-        await systemSettings.sync();
       }
 
       return onboardingComplete;
     },
     async checkForCompletedTasks() {
       let toUpdate: Record<string, DocValue> = {};
-      if (await this.checkIsOnboardingComplete()) {
-        return;
-      }
+      await this.checkIsOnboardingComplete();
 
       if (!fyo.singles.GetStarted?.salesItemCreated) {
         const count = await fyo.db.count('Item', { filters: { for: 'Sales' } });

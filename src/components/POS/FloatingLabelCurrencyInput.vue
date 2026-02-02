@@ -1,5 +1,10 @@
 <template>
   <div class="relative">
+    <div
+      class="absolute inset-y-0 start-3 flex items-center text-gray-500 pointer-events-none"
+    >
+      {{ currency ? fyo.currencySymbols[currency] : '' }}
+    </div>
     <input
       :type="inputType"
       :class="[inputClasses, size === 'large' ? 'text-lg' : 'text-sm']"
@@ -11,7 +16,8 @@
       @blur="onBlur"
       class="
         block
-        px-2.5
+        ps-10
+        pe-2.5
         pb-2.5
         pt-4
         w-full
@@ -39,31 +45,6 @@
         transform
         -translate-y-4
         scale-75
-        top-8
-        z-10
-        origin-[0]
-        bg-white2
-        px-2
-        peer-focus:px-2 peer-focus:text-blue-600
-        peer-placeholder-shown:scale-100
-        peer-placeholder-shown:-translate-y-1/2
-        peer-placeholder-shown:top-1/2
-        peer-focus:top-2 peer-focus:scale-75 peer-focus:-translate-y-4
-        left-1
-      "
-      >{{ currency ? fyo.currencySymbols[currency] : undefined }}</label
-    >
-    <label
-      for="floating_outlined"
-      :class="size === 'large' ? 'text-xl' : 'text-md'"
-      class="
-        absolute
-        font-medium
-        text-gray-500
-        duration-300
-        transform
-        -translate-y-4
-        scale-75
         top-1
         z-10
         origin-[0]
@@ -74,7 +55,7 @@
         peer-placeholder-shown:-translate-y-1/2
         peer-placeholder-shown:top-1/2
         peer-focus:top-2 peer-focus:scale-75 peer-focus:-translate-y-4
-        left-1
+        start-1
       "
       >{{ df.label }}</label
     >

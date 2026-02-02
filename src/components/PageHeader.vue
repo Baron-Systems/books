@@ -7,7 +7,7 @@
       items-center
       h-row-largest
       flex-shrink-0
-      dark:bg-gray-875
+      surface-bg
     "
     :class="[
       border ? 'border-b dark:border-gray-800' : '',

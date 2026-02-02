@@ -105,7 +105,8 @@
       "label": "Enable ERPNext Sync",
       "fieldtype": "Check",
       "default": false,
-      "section": "Features"
+      "section": "Features",
+      "hidden": true
     },
     {
       "fieldname": "enableLead",
@@ -133,7 +134,8 @@
       "label": "Enable Loyalty Program",
       "fieldtype": "Check",
       "default": false,
-      "section": "Features"
+      "section": "Features",
+      "hidden": true
     },
     {
       "fieldname": "enableCouponCode",

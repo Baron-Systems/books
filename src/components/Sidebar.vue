@@ -6,8 +6,7 @@
       flex
       justify-between
       flex-col
-      bg-gray-25
-      dark:bg-gray-900
+      sidebar-bg
       relative
     "
     :class="{
@@ -17,7 +16,14 @@
     <div>
       <!-- Company name -->
       <div
-        class="px-4 flex flex-row items-center justify-between mb-4"
+        class="
+          px-4
+          flex flex-row items-center justify-between
+          mb-4
+          pb-3
+          border-b
+          app-border
+        "
         :class="
           platform === 'Mac' && languageDirection === 'ltr' ? 'mt-10' : 'mt-2'
         "
@@ -31,6 +37,7 @@
             overflow-auto
             no-scrollbar
             select-none
+            text-gray-900
           "
         >
           {{ companyName }}
@@ -45,13 +52,14 @@
             flex
             items-center
             cursor-pointer
-            hover:bg-gray-100
+            accent-hover-bg
             dark:hover:bg-gray-875
             h-10
+            transition-colors
           "
           :class="
             isGroupActive(group) && !group.items
-              ? 'bg-gray-100 dark:bg-gray-875 border-s-4 border-gray-800 dark:border-gray-100'
+              ? 'accent-bg dark:bg-gray-875 border-s-4 accent-border'
               : ''
           "
           @click="routeToSidebarItem(group)"
@@ -66,10 +74,10 @@
             :class="isGroupActive(group) && !group.items ? '-ms-1' : ''"
           />
           <div
-            class="ms-2 text-lg text-gray-700"
+            class="ms-2 text-lg text-gray-800"
             :class="
               isGroupActive(group) && !group.items
-                ? 'text-gray-900 dark:text-gray-25'
+                ? 'accent-text'
                 : 'dark:text-gray-300'
             "
           >
@@ -89,12 +97,13 @@
               cursor-pointer
               flex
               items-center
-              hover:bg-gray-100
+              accent-hover-bg
               dark:hover:bg-gray-875
+              transition-colors
             "
             :class="
               isItemActive(item)
-                ? 'bg-gray-100 dark:bg-gray-875 text-gray-900 dark:text-gray-100 border-s-4 border-gray-800 dark:border-gray-100'
+                ? 'accent-bg dark:bg-gray-875 accent-text border-s-4 accent-border'
                 : 'text-gray-700 dark:text-gray-400'
             "
             @click="routeToSidebarItem(item)"
@@ -112,25 +121,7 @@
       <button
         class="
           flex
-          text-sm text-gray-600
-          dark:text-gray-500
-          hover:text-gray-800
-          dark:hover:text-gray-400
-          gap-1
-          items-center
-        "
-        @click="openDocumentation"
-      >
-        <feather-icon name="help-circle" class="h-4 w-4 flex-shrink-0" />
-        <p>
-          {{ t`Help` }}
-        </p>
-      </button>
-
-      <button
-        class="
-          flex
-          text-sm text-gray-600
+          text-sm text-gray-700
           dark:text-gray-500
           hover:text-gray-800
           dark:hover:text-gray-400
@@ -160,24 +151,6 @@
         <p>{{ t`Change DB` }}</p>
       </button>
 
-      <button
-        class="
-          flex
-          text-sm text-gray-600
-          dark:text-gray-500
-          hover:text-gray-800
-          dark:hover:text-gray-400
-          gap-1
-          items-center
-        "
-        @click="() => reportIssue()"
-      >
-        <feather-icon name="flag" class="h-4 w-4 flex-shrink-0" />
-        <p>
-          {{ t`Report Issue` }}
-        </p>
-      </button>
-
       <p
         v-if="showDevMode"
         class="text-xs text-gray-500 select-none cursor-pointer"
@@ -194,14 +167,20 @@
         absolute
         bottom-0
         end-0
-        text-gray-600
-        dark:text-gray-500
-        hover:bg-gray-100
+        accent-text
+        bg-white
+        dark:bg-gray-900
+        border
+        border-gray-200
+        dark:border-gray-800
+        shadow-sm
+        accent-hover-bg
         dark:hover:bg-gray-875
         rounded
         p-1
         m-4
         rtl-rotate-180
+        transition-colors
       "
       @click="() => toggleSidebar()"
     >
@@ -214,10 +193,8 @@
   </div>
 </template>
 <script lang="ts">
-import { reportIssue } from 'src/errorHandling';
 import { fyo } from 'src/initFyo';
 import { languageDirectionKey, shortcutsKey } from 'src/utils/injectionKeys';
-import { docsPathRef } from 'src/utils/refs';
 import { getSidebarConfig } from 'src/utils/sidebarConfig';
 import { SidebarConfig, SidebarItem, SidebarRoot } from 'src/utils/types';
 import { routeTo, toggleSidebar } from 'src/utils/ui';
@@ -280,7 +257,6 @@ export default defineComponent({
         this.toggleSidebar();
       }
     });
-    this.shortcuts?.set(COMPONENT_NAME, ['F1'], () => this.openDocumentation());
 
     this.showDevMode = this.fyo.store.isDevelopment;
   },
@@ -289,11 +265,7 @@ export default defineComponent({
   },
   methods: {
     routeTo,
-    reportIssue,
     toggleSidebar,
-    openDocumentation() {
-      ipc.openLink('https://docs.frappe.io/' + docsPathRef.value);
-    },
     setActiveGroup() {
       const { fullPath } = this.$router.currentRoute.value;
       const fallBackGroup = this.activeGroup;

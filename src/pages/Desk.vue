@@ -25,8 +25,7 @@ import { toggleSidebar } from 'src/utils/ui';
         flex flex-1
         overflow-y-hidden
         custom-scroll custom-scroll-thumb1
-        bg-white
-        dark:bg-gray-875
+        surface-bg
       "
     >
       <router-view v-slot="{ Component }">
@@ -60,16 +59,23 @@ import { toggleSidebar } from 'src/utils/ui';
         absolute
         bottom-0
         start-0
-        text-gray-600
-        dark:text-gray-400
-        hover:bg-gray-100
-        dark:hover:bg-gray-900
+        text-blue-700
+        dark:text-blue-200
+        bg-white
+        dark:bg-gray-900
+        border
+        border-gray-200
+        dark:border-gray-800
+        shadow-sm
+        hover:bg-blue-50
+        dark:hover:bg-gray-875
         rounded
         rtl-rotate-180
         p-1
         m-4
-        opacity-0
-        hover:opacity-100 hover:shadow-md
+        opacity-80
+        hover:opacity-100
+        transition
       "
       @click="() => toggleSidebar()"
     >

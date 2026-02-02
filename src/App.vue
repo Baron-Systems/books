@@ -2,7 +2,7 @@
   <div
     id="app"
     class="
-      dark:bg-gray-900
+      app-bg
       h-screen
       flex flex-col
       font-sans
@@ -36,6 +36,84 @@
       @setup-canceled="showDbSelector"
     />
 
+    <Modal :open-modal="licenseGate.open" @closemodal="onLicenseGateClose">
+      <div class="p-5 w-dialog text-gray-900 dark:text-gray-100">
+        <h2 class="text-xl font-semibold select-none">
+          {{
+            licenseGate.mode === 'activate'
+              ? 'تفعيل البرنامج'
+              : 'تفويض تغيير قاعدة البيانات'
+          }}
+        </h2>
+
+        <p v-if="licenseGate.mode === 'activate'" class="text-sm text-gray-600 dark:text-gray-400 mt-2">
+          أدخل مفتاح التفعيل وحدد عدد أيام التفعيل. عند انتهاء الأيام سيتم قفل البرنامج حتى يتم التفعيل مجددًا.
+        </p>
+        <p v-else class="text-sm text-gray-600 dark:text-gray-400 mt-2">
+          لا يمكن تغيير قاعدة البيانات بدون إدخال مفتاح التفعيل.
+        </p>
+
+        <div class="mt-4 space-y-3">
+          <div>
+            <label class="text-sm text-gray-700 dark:text-gray-300">مفتاح التفعيل</label>
+            <input
+              v-model="licenseGate.key"
+              type="text"
+              class="
+                mt-1
+                w-full
+                bg-gray-100
+                dark:bg-gray-875
+                focus:bg-gray-200
+                dark:focus:bg-gray-890
+                rounded-md
+                px-3
+                py-2
+                outline-none
+                font-mono
+              "
+              placeholder="XXXXX-XXXXX-XXXXX-XXXXX-XXXXX"
+            />
+          </div>
+
+          <div v-if="licenseGate.mode === 'activate'">
+            <label class="text-sm text-gray-700 dark:text-gray-300">عدد أيام التفعيل</label>
+            <input
+              v-model.number="licenseGate.days"
+              type="number"
+              min="1"
+              class="
+                mt-1
+                w-full
+                bg-gray-100
+                dark:bg-gray-875
+                focus:bg-gray-200
+                dark:focus:bg-gray-890
+                rounded-md
+                px-3
+                py-2
+                outline-none
+              "
+              placeholder="30"
+            />
+          </div>
+        </div>
+
+        <p v-if="licenseGate.error" class="text-sm text-red-600 mt-3">
+          {{ licenseGate.error }}
+        </p>
+
+        <div class="mt-5 flex justify-between gap-2">
+          <Button v-if="licenseGate.canCancel" @click="onLicenseGateCancel">إلغاء</Button>
+          <div class="ms-auto flex gap-2">
+            <Button type="primary" @click="submitLicenseGate">{{
+              licenseGate.mode === 'activate' ? 'تفعيل' : 'متابعة'
+            }}</Button>
+          </div>
+        </div>
+      </div>
+    </Modal>
+
     <!-- Render target for toasts -->
     <div
       id="toast-container"
@@ -50,6 +128,8 @@ import { ModelNameEnum } from 'models/types';
 import { systemLanguageRef } from 'src/utils/refs';
 import { defineComponent, provide, ref, Ref } from 'vue';
 import WindowsTitleBar from './components/WindowsTitleBar.vue';
+import Button from './components/Button.vue';
+import Modal from './components/Modal.vue';
 import { handleErrorWithDialog } from './errorHandling';
 import { fyo } from './initFyo';
 import DatabaseSelector from './pages/DatabaseSelector.vue';
@@ -69,7 +149,7 @@ import { Search } from './utils/search';
 import { Shortcuts } from './utils/shortcuts';
 import { routeTo } from './utils/ui';
 import { useKeys } from './utils/vueUtils';
-import { setDarkMode } from 'src/utils/theme';
+import { applyThemeSettings, setTheme } from 'src/utils/theme';
 import {
   registerInstanceToERPNext,
   updateERPNSyncSettings,
@@ -82,6 +162,14 @@ enum Screen {
   SetupWizard = 'SetupWizard',
 }
 
+type LicenseGateMode = 'activate' | 'authorize-db';
+
+const LICENSE_KEY = 'YTMG3-N6DKC-DKB77-7M9GH-8HVX7';
+
+const LICENSE_CFG = {
+  expiresAt: 'license.expiresAt',
+} as const;
+
 export default defineComponent({
   name: 'App',
   components: {
@@ -89,6 +177,8 @@ export default defineComponent({
     SetupWizard,
     DatabaseSelector,
     WindowsTitleBar,
+    Modal,
+    Button,
   },
   setup() {
     const keys = useKeys();
@@ -121,11 +211,29 @@ export default defineComponent({
       dbPath: '',
       companyName: '',
       darkMode: false,
+      licenseGate: {
+        open: false,
+        mode: 'activate' as LicenseGateMode,
+        key: '',
+        days: 30,
+        error: '',
+        canCancel: false,
+        pendingAction: null as null | 'change-db',
+      },
     } as {
       activeScreen: null | Screen;
       dbPath: string;
       companyName: string;
       darkMode: boolean | undefined;
+      licenseGate: {
+        open: boolean;
+        mode: LicenseGateMode;
+        key: string;
+        days: number;
+        error: string;
+        canCancel: boolean;
+        pendingAction: null | 'change-db';
+      };
     };
   },
   computed: {
@@ -139,12 +247,105 @@ export default defineComponent({
     },
   },
   async mounted() {
+    await this.ensureLicenseGateOnStartup();
     await this.setInitialScreen();
-    const darkMode = !!fyo.singles.SystemSettings?.darkMode;
-    setDarkMode(darkMode);
-    this.darkMode = darkMode;
+    // Apply Theme Settings (when SystemSettings is available)
+    const sys = fyo.singles.SystemSettings as any;
+    if (sys) {
+      applyThemeSettings(sys);
+      this.darkMode = (sys.themePreset || '').toString() === 'Dark';
+    } else {
+      // fallback
+      setTheme('blue');
+      this.darkMode = false;
+    }
   },
   methods: {
+    getLicenseConfig() {
+      const expiresAt = fyo.config.get(LICENSE_CFG.expiresAt, null) as string | null;
+      return { expiresAt };
+    },
+    isExpired(expiresAt: string | null): boolean {
+      if (!expiresAt) {
+        return true;
+      }
+      const ts = Date.parse(expiresAt);
+      if (Number.isNaN(ts)) {
+        return true;
+      }
+      return Date.now() > ts;
+    },
+    openLicenseGate(
+      mode: LicenseGateMode,
+      opts?: { canCancel?: boolean; pendingAction?: 'change-db' }
+    ) {
+      this.licenseGate.open = true;
+      this.licenseGate.mode = mode;
+      this.licenseGate.key = '';
+      this.licenseGate.error = '';
+      this.licenseGate.canCancel = !!opts?.canCancel;
+      this.licenseGate.pendingAction = opts?.pendingAction ?? null;
+      if (mode === 'authorize-db') {
+        this.licenseGate.days = 0;
+      } else if (!this.licenseGate.days || this.licenseGate.days < 1) {
+        this.licenseGate.days = 30;
+      }
+    },
+    async ensureLicenseGateOnStartup(): Promise<void> {
+      const { expiresAt } = this.getLicenseConfig();
+      if (this.isExpired(expiresAt)) {
+        this.openLicenseGate('activate', { canCancel: false });
+      }
+    },
+    onLicenseGateClose() {
+      // Do not allow closing when required
+      if (!this.licenseGate.canCancel) {
+        return;
+      }
+      this.onLicenseGateCancel();
+    },
+    onLicenseGateCancel() {
+      this.licenseGate.open = false;
+      this.licenseGate.key = '';
+      this.licenseGate.error = '';
+      this.licenseGate.pendingAction = null;
+    },
+    normalizeKey(key: string): string {
+      return key.replace(/\s+/g, '').toUpperCase();
+    },
+    async submitLicenseGate(): Promise<void> {
+      this.licenseGate.error = '';
+      const key = this.normalizeKey(this.licenseGate.key || '');
+      const expected = this.normalizeKey(LICENSE_KEY);
+      if (!key.length) {
+        this.licenseGate.error = 'مفتاح التفعيل مطلوب';
+        return;
+      }
+      if (key !== expected) {
+        this.licenseGate.error = 'مفتاح التفعيل غير صحيح';
+        return;
+      }
+
+      if (this.licenseGate.mode === 'activate') {
+        if (!this.licenseGate.days || this.licenseGate.days < 1) {
+          this.licenseGate.error = 'عدد الأيام يجب أن يكون 1 أو أكثر';
+          return;
+        }
+        const expiresAt = new Date(
+          Date.now() + this.licenseGate.days * 24 * 60 * 60 * 1000
+        ).toISOString();
+        fyo.config.set(LICENSE_CFG.expiresAt, expiresAt);
+        this.licenseGate.open = false;
+        return;
+      }
+
+      // authorize-db
+      this.licenseGate.open = false;
+      if (this.licenseGate.pendingAction === 'change-db') {
+        this.licenseGate.pendingAction = null;
+        await this.showDbSelectorInternal();
+      }
+    },
     async setInitialScreen(): Promise<void> {
       const lastSelectedFilePath = fyo.config.get('lastSelectedFilePath', null);
 
@@ -186,7 +387,7 @@ export default defineComponent({
           title: this.t`Cannot open file`,
           type: 'error',
           detail: this
-            .t`Frappe Books does not have access to the selected file: ${filePath}`,
+            .t`Baron Accounting does not have access to the selected file: ${filePath}`,
         });
 
         fyo.config.set('lastSelectedFilePath', null);
@@ -268,17 +469,29 @@ export default defineComponent({
       throw error;
     },
     async setDeskRoute(): Promise<void> {
-      const { onboardingComplete } = await fyo.doc.getDoc('GetStarted');
       const { hideGetStarted } = await fyo.doc.getDoc('SystemSettings');
 
       let route = '/get-started';
-      if (hideGetStarted || onboardingComplete) {
+      if (hideGetStarted) {
         route = localStorage.getItem('lastRoute') || '/';
       }
 
       await routeTo(route);
     },
     async showDbSelector(): Promise<void> {
+      const { expiresAt } = this.getLicenseConfig();
+      // If expired -> force activation first.
+      if (this.isExpired(expiresAt)) {
+        this.openLicenseGate('activate', { canCancel: false });
+        return;
+      }
+      // Always require key for DB switching
+      this.openLicenseGate('authorize-db', {
+        canCancel: true,
+        pendingAction: 'change-db',
+      });
+    },
+    async showDbSelectorInternal(): Promise<void> {
       localStorage.clear();
       fyo.config.set('lastSelectedFilePath', null);
       fyo.telemetry.stop();

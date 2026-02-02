@@ -135,12 +135,248 @@
       "hidden": true
     },
     {
+      "fieldname": "theme",
+      "label": "Theme",
+      "fieldtype": "Select",
+      "default": "blue",
+      "description": "Sets the theme of the app.",
+      "section": "Theme",
+      "hidden": true,
+      "options": [
+        {
+          "value": "blue",
+          "label": "Blue"
+        },
+        {
+          "value": "indigo",
+          "label": "Indigo"
+        },
+        {
+          "value": "teal",
+          "label": "Teal"
+        },
+        {
+          "value": "purple",
+          "label": "Purple"
+        },
+        {
+          "value": "dark",
+          "label": "Dark mode"
+        }
+      ]
+    },
+    {
+      "fieldname": "themePreset",
+      "label": "Theme Preset",
+      "fieldtype": "Select",
+      "default": "Modern",
+      "description": "Choose a ready-made theme preset.",
+      "section": "Theme Settings",
+      "options": [
+        { "value": "Light", "label": "Light" },
+        { "value": "Dark", "label": "Dark" },
+        { "value": "Classic", "label": "Classic" },
+        { "value": "Modern", "label": "Modern" }
+      ]
+    },
+    {
+      "fieldname": "liveApplyTheme",
+      "label": "Live Apply",
+      "fieldtype": "Check",
+      "default": true,
+      "description": "Apply theme changes instantly across the app.",
+      "section": "Theme Settings"
+    },
+    {
+      "fieldname": "primaryColor",
+      "label": "Primary",
+      "fieldtype": "Data",
+      "default": "#1F6AE1",
+      "sub_label": "لون الأزرار الأساسية (Primary) والحدود البارزة",
+      "description": "Primary color (hex).",
+      "section": "Theme Settings"
+    },
+    {
+      "fieldname": "secondaryColor",
+      "label": "Secondary",
+      "fieldtype": "Data",
+      "default": "#334155",
+      "sub_label": "لون العناصر الثانوية (Secondary) والتباين المساعد",
+      "description": "Secondary color (hex).",
+      "section": "Theme Settings"
+    },
+    {
+      "fieldname": "accentColor",
+      "label": "Accent",
+      "fieldtype": "Data",
+      "default": "#3B82F6",
+      "sub_label": "لون اللمسات: التحديد، Hover، وFocus",
+      "description": "Accent color (hex).",
+      "section": "Theme Settings"
+    },
+    {
+      "fieldname": "backgroundColor",
+      "label": "Background",
+      "fieldtype": "Data",
+      "default": "#F7F9FC",
+      "sub_label": "خلفية التطبيق والصفحات الرئيسية",
+      "description": "App background color (hex).",
+      "section": "Theme Settings"
+    },
+    {
+      "fieldname": "surfaceColor",
+      "label": "Surface",
+      "fieldtype": "Data",
+      "default": "#FFFFFF",
+      "sub_label": "خلفية البطاقات والحاويات (Cards/Containers)",
+      "description": "Cards/containers surface color (hex).",
+      "section": "Theme Settings"
+    },
+    {
+      "fieldname": "textColor",
+      "label": "Text",
+      "fieldtype": "Data",
+      "default": "#0F172A",
+      "sub_label": "لون النص الأساسي في كل الواجهات",
+      "description": "Main text color (hex).",
+      "section": "Theme Settings"
+    },
+    {
+      "fieldname": "mutedTextColor",
+      "label": "Muted Text",
+      "fieldtype": "Data",
+      "default": "#64748B",
+      "sub_label": "لون النص الثانوي والوصف وPlaceholder",
+      "description": "Secondary/muted text color (hex).",
+      "section": "Theme Settings"
+    },
+    {
+      "fieldname": "borderColor",
+      "label": "Border",
+      "fieldtype": "Data",
+      "default": "#E2E8F0",
+      "sub_label": "لون الحدود والفواصل والجداول",
+      "description": "Border color (hex).",
+      "section": "Theme Settings"
+    },
+    {
+      "fieldname": "successColor",
+      "label": "Success",
+      "fieldtype": "Data",
+      "default": "#16A34A",
+      "sub_label": "ألوان النجاح (Success) للتنبيهات/الشارات",
+      "description": "Success color (hex).",
+      "section": "Theme Settings"
+    },
+    {
+      "fieldname": "warningColor",
+      "label": "Warning",
+      "fieldtype": "Data",
+      "default": "#F59E0B",
+      "sub_label": "ألوان التحذير (Warning) للتنبيهات/الرسائل",
+      "description": "Warning color (hex).",
+      "section": "Theme Settings"
+    },
+    {
+      "fieldname": "dangerColor",
+      "label": "Danger",
+      "fieldtype": "Data",
+      "default": "#DC2626",
+      "sub_label": "ألوان الخطر/الخطأ (Danger) للتنبيهات",
+      "description": "Danger color (hex).",
+      "section": "Theme Settings"
+    },
+    {
+      "fieldname": "infoColor",
+      "label": "Info",
+      "fieldtype": "Data",
+      "default": "#0EA5E9",
+      "sub_label": "ألوان المعلومات (Info) للتنبيهات/المساعدة",
+      "description": "Info color (hex).",
+      "section": "Theme Settings"
+    },
+    {
+      "fieldname": "fontFamily",
+      "label": "Font Family",
+      "fieldtype": "Select",
+      "default": "Inter",
+      "section": "Theme Settings",
+      "options": [
+        { "value": "Inter", "label": "Inter" },
+        { "value": "Arial", "label": "Arial" },
+        { "value": "Times New Roman", "label": "Times New Roman" }
+      ]
+    },
+    {
+      "fieldname": "baseFontSize",
+      "label": "Base Font Size",
+      "fieldtype": "Int",
+      "default": 16,
+      "minvalue": 11,
+      "maxvalue": 18,
+      "section": "Theme Settings"
+    },
+    {
+      "fieldname": "headingFontSize",
+      "label": "Heading Font Size",
+      "fieldtype": "Int",
+      "default": 18,
+      "minvalue": 16,
+      "maxvalue": 28,
+      "section": "Theme Settings"
+    },
+    {
+      "fieldname": "radiusLevel",
+      "label": "Border Radius",
+      "fieldtype": "Select",
+      "default": "Medium",
+      "section": "Theme Settings",
+      "options": [
+        { "value": "Small", "label": "Small" },
+        { "value": "Medium", "label": "Medium" },
+        { "value": "Large", "label": "Large" }
+      ]
+    },
+    {
+      "fieldname": "shadowLevel",
+      "label": "Shadow",
+      "fieldtype": "Select",
+      "default": "Light",
+      "section": "Theme Settings",
+      "options": [
+        { "value": "Light", "label": "Soft" },
+        { "value": "Medium", "label": "Medium" },
+        { "value": "Strong", "label": "Strong" }
+      ]
+    },
+    {
+      "fieldname": "iconStyle",
+      "label": "Icon Style",
+      "fieldtype": "Select",
+      "default": "Line",
+      "section": "Theme Settings",
+      "options": [
+        { "value": "Line", "label": "Line" },
+        { "value": "Filled", "label": "Filled" }
+      ]
+    },
+    {
+      "fieldname": "iconColor",
+      "label": "Default Icon Color",
+      "fieldtype": "Data",
+      "default": "#1F6AE1",
+      "sub_label": "لون الأيقونات الافتراضي داخل الواجهة",
+      "description": "Default icon color (hex).",
+      "section": "Theme Settings"
+    },
+    {
       "fieldname": "darkMode",
       "label": "Dark mode",
       "fieldtype": "Check",
       "default": false,
       "description": "Sets the theme of the app.",
-      "section": "Theme"
+      "section": "Theme",
+      "hidden": true
     },
     {
       "fieldname": "displayTermsAndConditions",

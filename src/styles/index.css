@@ -7,7 +7,7 @@
 }
 
 * {
-  outline-color: theme('colors.pink.400');
+  outline-color: var(--accent-400);
   font-variation-settings: 'slnt' 0deg;
 }
 .italic {
@@ -22,12 +22,46 @@
 
 html {
   color: theme('colors.black');
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+  font-family: var(--font-sans, 'Inter', sans-serif);
+  font-size: var(--font-base, 13px);
 }
 
 html.dark {
   color: theme('colors.black');
   background-color: theme('colors.gray.900');
   color-scheme: dark;
+}
+
+html.dark {
+  --app-bg: theme('colors.gray.900');
+  --surface-bg: theme('colors.gray.875');
+  --sidebar-bg: theme('colors.gray.900');
+  --border-color: theme('colors.gray.800');
+}
+
+/*
+  Theme Settings variables (full theme)
+*/
+:root {
+  --primary: #1f6ae1;
+  --secondary: #334155;
+  --accent: #3b82f6;
+  --text: #0f172a;
+  --muted-text: #64748b;
+  --border: #e2e8f0;
+  --success: #16a34a;
+  --warning: #f59e0b;
+  --danger: #dc2626;
+  --info: #0ea5e9;
+  --icon: #1f6ae1;
+  --font-sans: 'Inter', sans-serif;
+  --font-base: 16px;
+  --font-heading: 18px;
+  --radius: 6px;
+  --shadow: 0 1px 2px rgba(0, 0, 0, 0.06);
 }
 
 html.dark input[type='date']::-webkit-calendar-picker-indicator {
@@ -86,6 +120,74 @@ input[type='number']::-webkit-inner-spin-button {
   --h-row-large: 3.5rem;
   --h-row-largest: 4rem;
   --h-app: 800px;
+
+  /*
+    Theme / Accent colors (used for highlights)
+  */
+  --accent-50: theme('colors.blue.50');
+  --accent-100: theme('colors.blue.100');
+  --accent-200: theme('colors.blue.200');
+  --accent-400: theme('colors.blue.400');
+  --accent-500: theme('colors.blue.500');
+  --accent-600: theme('colors.blue.600');
+  --accent-700: theme('colors.blue.700');
+  --accent-900: theme('colors.blue.900');
+
+  /*
+    Theme / Surfaces (used for background + borders)
+  */
+  --app-bg: theme('colors.gray.50');
+  --surface-bg: theme('colors.white');
+  --sidebar-bg: theme('colors.gray.50');
+  --border-color: theme('colors.gray.200');
+}
+
+html.theme-indigo {
+  --accent-50: theme('colors.indigo.100');
+  --accent-100: theme('colors.indigo.200');
+  --accent-200: theme('colors.indigo.300');
+  --accent-400: theme('colors.indigo.400');
+  --accent-500: theme('colors.indigo.500');
+  --accent-600: theme('colors.indigo.600');
+  --accent-700: theme('colors.indigo.700');
+  --accent-900: theme('colors.indigo.900');
+
+  --app-bg: theme('colors.gray.50');
+  --surface-bg: theme('colors.white');
+  --sidebar-bg: var(--accent-50);
+  --border-color: theme('colors.gray.200');
+}
+
+html.theme-teal {
+  --accent-50: theme('colors.teal.50');
+  --accent-100: theme('colors.teal.100');
+  --accent-200: theme('colors.teal.200');
+  --accent-400: theme('colors.teal.400');
+  --accent-500: theme('colors.teal.500');
+  --accent-600: theme('colors.teal.600');
+  --accent-700: theme('colors.teal.700');
+  --accent-900: theme('colors.teal.900');
+
+  --app-bg: theme('colors.gray.50');
+  --surface-bg: theme('colors.white');
+  --sidebar-bg: var(--accent-50);
+  --border-color: theme('colors.gray.200');
+}
+
+html.theme-purple {
+  --accent-50: theme('colors.purple.50');
+  --accent-100: theme('colors.purple.100');
+  --accent-200: theme('colors.purple.200');
+  --accent-400: theme('colors.purple.400');
+  --accent-500: theme('colors.purple.500');
+  --accent-600: theme('colors.purple.600');
+  --accent-700: theme('colors.purple.700');
+  --accent-900: theme('colors.purple.900');
+
+  --app-bg: theme('colors.gray.50');
+  --surface-bg: theme('colors.white');
+  --sidebar-bg: var(--accent-50);
+  --border-color: theme('colors.gray.200');
 }
 
 .backdrop {
@@ -256,4 +358,188 @@ input[type='number']::-webkit-inner-spin-button {
   @apply py-0.5 px-1.5 rounded-md  text-xs;
   width: fit-content;
   height: fit-content;
+}
+
+/*
+  Accent helper classes (theme-aware)
+*/
+.accent-border {
+  border-color: var(--accent-600);
+}
+html.dark .accent-border {
+  border-color: var(--accent-400);
+}
+
+.accent-text {
+  color: var(--accent-900);
+}
+html.dark .accent-text {
+  color: var(--accent-100);
+}
+
+html:not(.dark) .accent-bg {
+  background-color: var(--accent-50);
+}
+
+html:not(.dark) .accent-hover-bg:hover {
+  background-color: var(--accent-50);
+}
+
+.accent-icon-bg {
+  background-color: var(--accent-500);
+}
+html.dark .accent-icon-bg {
+  background-color: var(--accent-600);
+}
+
+.accent-chip {
+  color: var(--accent-700);
+  background-color: var(--accent-100);
+  border-color: var(--accent-100);
+}
+html.dark .accent-chip {
+  color: var(--accent-100);
+  background-color: var(--accent-600);
+  border-color: var(--accent-600);
+}
+
+/*
+  Surface helper classes (theme-aware)
+*/
+.app-bg {
+  background-color: var(--app-bg);
+}
+.surface-bg {
+  background-color: var(--surface-bg);
+}
+.sidebar-bg {
+  background-color: var(--sidebar-bg);
+}
+.app-border {
+  border-color: var(--border-color);
+}
+
+/*
+  Force theme across common Tailwind utility classes (mandatory)
+*/
+body {
+  background-color: var(--app-bg) !important;
+  color: var(--text) !important;
+}
+
+.bg-white {
+  background-color: var(--surface-bg) !important;
+}
+.bg-gray-50,
+.bg-gray-25 {
+  background-color: var(--app-bg) !important;
+}
+html.dark .bg-gray-875,
+html.dark .bg-gray-890,
+html.dark .bg-gray-850,
+html.dark .bg-gray-900 {
+  background-color: var(--surface-bg) !important;
+}
+
+.border-gray-200,
+.border-gray-100,
+.border-gray-300,
+.dark\\:border-gray-800,
+.dark\\:border-gray-850,
+.dark\\:border-gray-800 {
+  border-color: var(--border-color) !important;
+}
+
+.text-gray-900,
+.text-gray-800,
+.text-gray-700,
+.dark\\:text-gray-100,
+.dark\\:text-gray-25 {
+  color: var(--text) !important;
+}
+
+.text-gray-600,
+.text-gray-500,
+.text-gray-400,
+.dark\\:text-gray-400,
+.dark\\:text-gray-300,
+.dark\\:text-gray-200 {
+  color: var(--muted-text) !important;
+}
+
+/* Icon default */
+svg,
+.feather-icon,
+.fill-current,
+.stroke-current {
+  color: var(--icon) !important;
+}
+
+/* Buttons */
+.btn-primary {
+  background-color: var(--primary) !important;
+  color: #fff !important;
+  box-shadow: var(--shadow) !important;
+}
+.btn-primary * {
+  color: #fff !important;
+}
+.btn-secondary {
+  background-color: var(--surface-bg) !important;
+  border: 1px solid var(--border-color) !important;
+  color: var(--text) !important;
+}
+.btn-secondary * {
+  color: var(--text) !important;
+}
+.btn-outline {
+  background-color: transparent !important;
+  border: 1px solid var(--primary) !important;
+  color: var(--primary) !important;
+}
+.btn-outline * {
+  color: var(--primary) !important;
+}
+.btn-ghost {
+  background-color: transparent !important;
+  color: var(--text) !important;
+}
+.btn-ghost * {
+  color: var(--text) !important;
+}
+.btn-primary:hover,
+.btn-secondary:hover,
+.btn-outline:hover,
+.btn-ghost:hover {
+  filter: brightness(0.97);
+}
+.btn-primary:disabled,
+.btn-secondary:disabled,
+.btn-outline:disabled,
+.btn-ghost:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Inputs */
+input,
+select,
+textarea {
+  border-radius: var(--radius);
+}
+input::placeholder,
+textarea::placeholder {
+  color: var(--muted-text);
+}
+
+/* Headings */
+h1,
+h2,
+h3 {
+  font-size: var(--font-heading);
+}
+
+/* Icon style (limited) */
+html.icons-filled .fill-current {
+  fill: currentColor;
 }

@@ -2,12 +2,9 @@
   <FormContainer :use-full-width="useFullWidth">
     <template v-if="hasDoc" #header-left>
       <Barcode
-        v-if="canShowBarcode"
+        v-if="canShowBarcode && !isInvoiceWithItems"
         class="h-8"
-        @item-selected="(name:string) => {
-          // @ts-ignore
-          doc?.addItem(name);
-        }"
+        @item-selected="onBarcodeItemSelected"
       />
       <ExchangeRate
         v-if="canShowExchangeRate"
@@ -15,13 +12,10 @@
         :from-currency="fromCurrency"
         :to-currency="toCurrency"
         :exchange-rate="exchangeRate"
-        @change="
-          async (exchangeRate: number) =>
-            await doc.set('exchangeRate', exchangeRate)
-        "
+        @change="onExchangeRateChange"
       />
       <p
-        v-if="schema.label && !(canShowBarcode || canShowExchangeRate)"
+        v-if="schema.label && !((canShowBarcode && !isInvoiceWithItems) || canShowExchangeRate)"
         class="text-xl font-semibold items-center text-gray-600"
       >
         {{ schema.label }}
@@ -66,7 +60,13 @@
         </p>
         <feather-icon v-else name="more-horizontal" class="w-4 h-4" />
       </DropdownWithActions>
-      <Button v-if="doc?.canSave" type="primary" @click="sync">
+      <Button
+        v-if="doc?.canSave"
+        type="primary"
+        :disabled="!canSavePayment"
+        :title="!canSavePayment ? t`جلب الفواتير المعلقة أولاً` : undefined"
+        @click="sync"
+      >
         {{ t`Save` }}
       </Button>
       <Button v-else-if="doc?.canSubmit" type="primary" @click="submit">{{
@@ -88,30 +88,78 @@
         <StatusPill v-if="hasDoc" :doc="doc" />
       </FormHeader>
 
+      <!-- Journal Entry template selector (UI only; does not change posting logic) -->
+      <JournalEntryTemplateSelector
+        v-if="hasDoc && isJournalEntryForm && canUseTemplate"
+        :doc="doc"
+        @applied="updateGroupedFields"
+      />
+
       <!-- Section Container -->
       <div
         v-if="hasDoc"
         class="overflow-auto custom-scroll custom-scroll-thumb1"
       >
-        <CommonFormSection
+        <template
           v-for="([n, fields], idx) in activeGroup.entries()"
           :key="n + idx"
-          ref="section"
-          class="p-4"
-          :class="
-            idx !== 0 && activeGroup.size > 1
-              ? 'border-t dark:border-gray-800'
-              : ''
-          "
-          :show-title="activeGroup.size > 1 && n !== t`Default`"
-          :title="n"
-          :fields="fields"
-          :doc="doc"
-          :errors="errors"
-          @editrow="(doc: Doc) => showRowEditForm(doc)"
-          @value-change="onValueChange"
-          @row-change="updateGroupedFields"
-        />
+        >
+          <CommonFormSection
+            ref="section"
+            class="p-4"
+            :class="
+              idx !== 0 && activeGroup.size > 1
+                ? 'border-t dark:border-gray-800'
+                : ''
+            "
+            :show-title="activeGroup.size > 1 && n !== t`Default`"
+            :title="n"
+            :fields="fields"
+            :doc="doc"
+            :errors="errors"
+            :show-barcode-above-items="canShowBarcode && isInvoiceWithItems"
+            @editrow="showRowEditForm"
+            @value-change="onValueChange"
+            @row-change="updateGroupedFields"
+            @outstanding-invoices-fetched="paymentOutstandingInvoicesFetched = true"
+            @outstanding-invoices-reset="paymentOutstandingInvoicesFetched = false"
+            @item-selected="onSectionItemSelected"
+          />
+          <!-- سطر المجاميع: مباشرة تحت الحسابات وفوق المراجع -->
+          <div
+            v-if="
+              showJournalEntryTotals &&
+              journalEntryAccountsTotals &&
+              sectionHasAccountsTable(fields)
+            "
+            class="mx-4 mb-4 flex gap-6 flex-wrap py-2 px-3 rounded-md border dark:border-gray-800 bg-gray-50 dark:bg-gray-890 text-sm"
+          >
+            <span class="text-gray-600 dark:text-gray-400">
+              {{ t`مجموع المدين` }}:
+              <strong class="text-gray-900 dark:text-gray-100">{{
+                doc.fyo.format(journalEntryAccountsTotals.totalDebit, 'Currency')
+              }}</strong>
+            </span>
+            <span class="text-gray-600 dark:text-gray-400">
+              {{ t`مجموع الدائن` }}:
+              <strong class="text-gray-900 dark:text-gray-100">{{
+                doc.fyo.format(journalEntryAccountsTotals.totalCredit, 'Currency')
+              }}</strong>
+            </span>
+            <span
+              :class="
+                journalEntryAccountsTotals.difference !== 0
+                  ? 'text-amber-600 dark:text-amber-400'
+                  : 'text-gray-600 dark:text-gray-400'
+              "
+            >
+              {{ t`الفرق` }}:
+              <strong>{{
+                doc.fyo.format(journalEntryAccountsTotals.difference, 'Currency')
+              }}</strong>
+            </span>
+          </div>
+        </template>
       </div>
 
       <!-- Tab Bar -->
@@ -164,8 +212,8 @@
           :doc="doc"
           :fieldname="row.fieldname"
           :index="row.index"
-          @previous="(i:number) => row!.index = i"
-          @next="(i:number) => row!.index = i"
+          @previous="setRowIndex"
+          @next="setRowIndex"
           @close="() => (row = null)"
         />
       </Transition>
@@ -180,6 +228,7 @@ import { ValidationError } from 'fyo/utils/errors';
 import { getDocStatus } from 'models/helpers';
 import { ModelNameEnum } from 'models/types';
 import { Field, Schema } from 'schemas/types';
+import { isPesa } from 'fyo/utils';
 import Button from 'src/components/Button.vue';
 import Barcode from 'src/components/Controls/Barcode.vue';
 import ExchangeRate from 'src/components/Controls/ExchangeRate.vue';
@@ -204,6 +253,7 @@ import {
 } from 'src/utils/ui';
 import { useDocShortcuts } from 'src/utils/vueUtils';
 import { computed, defineComponent, inject, nextTick, ref } from 'vue';
+import JournalEntryTemplateSelector from './JournalEntryTemplateSelector.vue';
 import CommonFormSection from './CommonFormSection.vue';
 import LinkedEntries from './LinkedEntries.vue';
 import RowEditForm from './RowEditForm.vue';
@@ -212,6 +262,7 @@ export default defineComponent({
   components: {
     FormContainer,
     FormHeader,
+    JournalEntryTemplateSelector,
     CommonFormSection,
     Button,
     DropdownWithActions,
@@ -235,7 +286,9 @@ export default defineComponent({
     const docOrNull = ref(null) as DocRef;
     let context = 'CommonForm';
     if (shortcuts) {
-      context = useDocShortcuts(shortcuts, docOrNull, 'CommonForm', true);
+      context = useDocShortcuts(shortcuts, docOrNull, 'CommonForm', true, {
+        enableSaveShortcut: false,
+      });
     }
 
     return {
@@ -254,6 +307,7 @@ export default defineComponent({
       showLinks: false,
       useFullWidth: false,
       row: null,
+      paymentOutstandingInvoicesFetched: false,
     } as {
       errors: Record<string, string>;
       activeTab: string;
@@ -262,9 +316,19 @@ export default defineComponent({
       showLinks: boolean;
       useFullWidth: boolean;
       row: null | { index: number; fieldname: string };
+      paymentOutstandingInvoicesFetched: boolean;
     };
   },
   computed: {
+    canSavePayment(): boolean {
+      if (this.schemaName !== 'Payment' || !this.hasDoc) {
+        return true;
+      }
+      if (this.doc.inserted) {
+        return true;
+      }
+      return this.paymentOutstandingInvoicesFetched;
+    },
     canShowBarcode(): boolean {
       if (!this.fyo.singles.InventorySettings?.enableBarcodes) {
         return false;
@@ -328,6 +392,57 @@ export default defineComponent({
     hasDoc(): boolean {
       return this.docOrNull instanceof Doc;
     },
+    isJournalEntryForm(): boolean {
+      return this.schemaName === ModelNameEnum.JournalEntry;
+    },
+    /** عرض مجاميع المدين/الدائن فقط في صفحة القيود اليومية وعند تبويب الحسابات */
+    showJournalEntryTotals(): boolean {
+      if (!this.hasDoc || !this.isJournalEntryForm) {
+        return false;
+      }
+      const fieldsInCurrentTab = [...(this.activeGroup?.values() ?? [])].flat();
+      return fieldsInCurrentTab.some(
+        (f) => f.fieldname === 'accounts' && f.fieldtype === 'Table'
+      );
+    },
+    journalEntryAccountsTotals(): {
+      totalDebit: number;
+      totalCredit: number;
+      difference: number;
+    } | null {
+      if (!this.hasDoc || this.schemaName !== ModelNameEnum.JournalEntry) {
+        return null;
+      }
+      const list = this.doc.accounts;
+      if (!Array.isArray(list)) {
+        return { totalDebit: 0, totalCredit: 0, difference: 0 };
+      }
+      let totalDebit = 0;
+      let totalCredit = 0;
+      for (const row of list) {
+        const r = row as { debit?: unknown; credit?: unknown };
+        totalDebit += this.toNumeric(r?.debit);
+        totalCredit += this.toNumeric(r?.credit);
+      }
+      return {
+        totalDebit,
+        totalCredit,
+        difference: totalDebit - totalCredit,
+      };
+    },
+    isInvoiceWithItems(): boolean {
+      return (
+        this.schemaName === ModelNameEnum.SalesInvoice ||
+        this.schemaName === ModelNameEnum.PurchaseInvoice
+      );
+    },
+    canUseTemplate(): boolean {
+      return (
+        !!this.hasDoc &&
+        !this.doc.isSubmitted &&
+        !this.doc.isCancelled
+      );
+    },
     status(): string {
       if (!this.hasDoc) {
         return '';
@@ -380,6 +495,14 @@ export default defineComponent({
       return getGroupedActionsForDoc(this.doc);
     },
   },
+  watch: {
+    name() {
+      void this.setDoc();
+    },
+    schemaName() {
+      void this.setDoc();
+    },
+  },
   beforeMount() {
     this.useFullWidth = !!this.fyo.singles.Misc?.useFullWidth;
   },
@@ -390,6 +513,9 @@ export default defineComponent({
     }
 
     await this.setDoc();
+    if (this.hasDoc && this.schemaName === 'Payment') {
+      this.paymentOutstandingInvoicesFetched = !!this.doc.inserted;
+    }
     this.replacePathAfterSync();
     this.updateGroupedFields();
     if (this.groupedFields) {
@@ -422,6 +548,44 @@ export default defineComponent({
   },
   methods: {
     routeTo,
+    onBarcodeItemSelected(name: string) {
+      // Some docs (e.g. Invoice) implement addItem; keep this optional.
+      const maybe = this.doc as unknown as { addItem?: (n: string) => unknown };
+      return maybe.addItem?.(name);
+    },
+    async onExchangeRateChange(exchangeRate: number) {
+      if (!this.hasDoc) {
+        return;
+      }
+      await this.doc.set('exchangeRate', exchangeRate);
+    },
+    onSectionItemSelected(name: string) {
+      const maybe = this.doc as unknown as { addItem?: (n: string) => unknown };
+      return maybe.addItem?.(name);
+    },
+    setRowIndex(i: number) {
+      if (!this.row) {
+        return;
+      }
+      this.row.index = i;
+    },
+    toNumeric(value: unknown): number {
+      if (value == null || value === '') {
+        return 0;
+      }
+      if (typeof value === 'number' && !Number.isNaN(value)) {
+        return value;
+      }
+      if (isPesa(value)) {
+        return (value as { float: number }).float;
+      }
+      return Number(value) || 0;
+    },
+    sectionHasAccountsTable(fields: Field[]): boolean {
+      return (fields ?? []).some(
+        (f) => f.fieldname === 'accounts' && f.fieldtype === 'Table'
+      );
+    },
     async toggleWidth() {
       const value = !this.useFullWidth;
       await this.fyo.singles.Misc?.setAndSync('useFullWidth', value);
@@ -438,6 +602,9 @@ export default defineComponent({
       );
     },
     async sync(useDialog?: boolean) {
+      if (!this.canSavePayment) {
+        return;
+      }
       if (await commonDocSync(this.doc, useDialog)) {
         this.updateGroupedFields();
       }
@@ -448,7 +615,12 @@ export default defineComponent({
       }
     },
     async setDoc() {
-      if (this.hasDoc) {
+      // Skip reload when we already have the doc for this route (e.g. after save + replace)
+      if (
+        this.docOrNull &&
+        this.docOrNull.name === this.name &&
+        this.docOrNull.schemaName === this.schemaName
+      ) {
         return;
       }
 

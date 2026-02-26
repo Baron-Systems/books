@@ -10,8 +10,12 @@ import GetStarted from './app/GetStarted.json';
 import Invoice from './app/Invoice.json';
 import InvoiceItem from './app/InvoiceItem.json';
 import Item from './app/Item.json';
+import ItemBarcode from './app/ItemBarcode.json';
+import ItemPriceListItem from './app/ItemPriceListItem.json';
 import JournalEntry from './app/JournalEntry.json';
 import JournalEntryAccount from './app/JournalEntryAccount.json';
+import JournalEntryTemplate from './app/JournalEntryTemplate.json';
+import JournalEntryTemplateLine from './app/JournalEntryTemplateLine.json';
 import Misc from './app/Misc.json';
 import NumberSeries from './app/NumberSeries.json';
 import Party from './app/Party.json';
@@ -80,6 +84,7 @@ import ERPNextSyncQueue from './app/ERPNextSyncQueue.json';
 import FetchFromERPNextQueue from './app/FetchFromERPNextQueue.json';
 import IntegrationErrorLog from './app/IntegrationErrorLog.json';
 import ItemGroup from './app/ItemGroup.json';
+import User from './app/User.json';
 import { Schema, SchemaStub } from './types';
 import ItemEnquiry from './app/ItemEnquiry.json';
 
@@ -118,6 +123,8 @@ export const appSchemas: Schema[] | SchemaStub[] = [
   Address as Schema,
   ItemGroup as Schema,
   Item as Schema,
+  ItemBarcode as Schema,
+  ItemPriceListItem as SchemaStub,
   UOM as Schema,
   UOMConversionItem as Schema,
 
@@ -131,6 +138,8 @@ export const appSchemas: Schema[] | SchemaStub[] = [
 
   JournalEntry as Schema,
   JournalEntryAccount as Schema,
+  JournalEntryTemplate as Schema,
+  JournalEntryTemplateLine as Schema,
 
   Invoice as Schema,
   ItemEnquiry as Schema,
@@ -192,4 +201,5 @@ export const appSchemas: Schema[] | SchemaStub[] = [
   FetchFromERPNextQueue as Schema,
 
   IntegrationErrorLog as Schema,
+  User as Schema,
 ];

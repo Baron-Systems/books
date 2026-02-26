@@ -37,13 +37,13 @@ export class LedgerPosting {
     this.reverted = false;
   }
 
-  async debit(account: string, amount: Money) {
-    const ledgerEntry = this._getLedgerEntry(account, 'debit');
+  async debit(account: string, amount: Money, party?: string) {
+    const ledgerEntry = this._getLedgerEntry(account, 'debit', party);
     await ledgerEntry.set('debit', ledgerEntry.debit!.add(amount));
   }
 
-  async credit(account: string, amount: Money) {
-    const ledgerEntry = this._getLedgerEntry(account, 'credit');
+  async credit(account: string, amount: Money, party?: string) {
+    const ledgerEntry = this._getLedgerEntry(account, 'credit', party);
     await ledgerEntry.set('credit', ledgerEntry.credit!.add(amount));
   }
 
@@ -94,24 +94,26 @@ export class LedgerPosting {
 
   _getLedgerEntry(
     account: string,
-    type: TransactionType
+    type: TransactionType,
+    party?: string
   ): AccountingLedgerEntry {
     let map = this.creditMap;
     if (type === 'debit') {
       map = this.debitMap;
     }
 
-    if (map[account]) {
-      return map[account];
-    }
+    const partyValue = party ?? (this.refDoc.party as string) ?? '';
+    const mapKey = `${account}|${partyValue}`;
 
-    // end ugly timezone fix code
+    if (map[mapKey]) {
+      return map[mapKey];
+    }
 
     const ledgerEntry = this.fyo.doc.getNewDoc(
       ModelNameEnum.AccountingLedgerEntry,
       {
         account: account,
-        party: (this.refDoc.party as string) ?? '',
+        party: partyValue,
         date: this.timezoneDateTimeAdjuster(this.refDoc.date as string | Date),
         referenceType: this.refDoc.schemaName,
         referenceName: this.refDoc.name!,
@@ -123,9 +125,9 @@ export class LedgerPosting {
     ) as AccountingLedgerEntry;
 
     this.entries.push(ledgerEntry);
-    map[account] = ledgerEntry;
+    map[mapKey] = ledgerEntry;
 
-    return map[account];
+    return map[mapKey];
   }
 
   _validateIsEqual() {

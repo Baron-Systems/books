@@ -989,6 +989,15 @@ __metadata:
   languageName: node
   linkType: hard
 
+"@types/bcryptjs@npm:^3.0.0":
+  version: 3.0.0
+  resolution: "@types/bcryptjs@npm:3.0.0"
+  dependencies:
+    bcryptjs: "npm:*"
+  checksum: 10c0/5d61ce381736f8252627cf32f2bbc17003c0361c6cf63ac23034a651b9c1edfdbf8f786730816e0b5257a927ffa369658562183a68495eb07ca2ddc77fbb171c
+  languageName: node
+  linkType: hard
+
 "@types/better-sqlite3@npm:^7.6.4":
   version: 7.6.4
   resolution: "@types/better-sqlite3@npm:7.6.4"
@@ -1957,10 +1966,95 @@ __metadata:
   languageName: node
   linkType: hard
 
+"baron-accounting@workspace:.":
+  version: 0.0.0-use.local
+  resolution: "baron-accounting@workspace:."
+  dependencies:
+    "@codemirror/autocomplete": "npm:^6.4.2"
+    "@codemirror/lang-vue": "npm:^0.1.1"
+    "@codemirror/language": "npm:^6.0.0"
+    "@codemirror/state": "npm:^6.0.0"
+    "@codemirror/view": "npm:^6.0.0"
+    "@electron/rebuild": "npm:^3.4.1"
+    "@lezer/common": "npm:^1.0.0"
+    "@popperjs/core": "npm:^2.10.2"
+    "@types/assert": "npm:^1.5.6"
+    "@types/bcryptjs": "npm:^3.0.0"
+    "@types/better-sqlite3": "npm:^7.6.4"
+    "@types/electron-devtools-installer": "npm:^2.2.0"
+    "@types/lodash": "npm:^4.14.179"
+    "@types/luxon": "npm:^2.3.1"
+    "@types/node": "npm:^17.0.23"
+    "@types/node-fetch": "npm:^2.6.1"
+    "@types/tape": "npm:^4.13.2"
+    "@typescript-eslint/eslint-plugin": "npm:5.60.0"
+    "@typescript-eslint/parser": "npm:5.60.0"
+    "@vitejs/plugin-vue": "npm:^4.2.3"
+    autoprefixer: "npm:^9"
+    bcryptjs: "npm:^2.4.3"
+    better-sqlite3: "npm:^9.2.2"
+    bree: "npm:^9.2.4"
+    chokidar: "npm:^3.5.3"
+    codemirror: "npm:^6.0.1"
+    core-js: "npm:^3.19.0"
+    dotenv: "npm:^16.0.0"
+    electron: "npm:22.3.27"
+    electron-builder: "npm:^24.9.1"
+    electron-devtools-installer: "npm:^3.2.0"
+    electron-store: "npm:^8.0.1"
+    electron-updater: "npm:^6.3.0"
+    eslint: "npm:^8.43.0"
+    eslint-config-prettier: "npm:^8.3.0"
+    eslint-plugin-prettier: "npm:^4.0.0"
+    eslint-plugin-vue: "npm:^9.15.0"
+    execa: "npm:^7.1.1"
+    feather-icons: "npm:^4.28.0"
+    fs-extra: "npm:^11.1.1"
+    knex: "npm:^2.4.0"
+    lodash: "npm:^4.17.21"
+    luxon: "npm:^2.5.2"
+    node-fetch: "npm:2"
+    pesa: "npm:^1.1.12"
+    playwright: "npm:^1.55.1"
+    postcss: "npm:^8"
+    prettier: "npm:^2.4.1"
+    source-map-support: "npm:^0.5.21"
+    tailwindcss: "npm:@tailwindcss/postcss7-compat@2.2.17"
+    tailwindcss-rtl: "npm:^0.9.0"
+    tap-spec: "npm:^5.0.0"
+    tape: "npm:^5.6.1"
+    ts-node: "npm:^10.7.0"
+    tsconfig-paths: "npm:^3.14.1"
+    tslib: "npm:^2.3.1"
+    typescript: "npm:^4.6.2"
+    vite: "npm:^5.4.21"
+    vue: "npm:^3.2.40"
+    vue-router: "npm:^4.0.12"
+    vue-tsc: "npm:^1.6.5"
+    yargs: "npm:^17.7.2"
+  languageName: unknown
+  linkType: soft
+
 "base64-js@npm:^1.3.1, base64-js@npm:^1.5.1":
   version: 1.5.1
   resolution: "base64-js@npm:1.5.1"
   checksum: 10c0/f23823513b63173a001030fae4f2dabe283b99a9d324ade3ad3d148e218134676f1ee8568c877cd79ec1c53158dcf2d2ba527a97c606618928ba99dd930102bf
+  languageName: node
+  linkType: hard
+
+"bcryptjs@npm:*":
+  version: 3.0.3
+  resolution: "bcryptjs@npm:3.0.3"
+  bin:
+    bcrypt: bin/bcrypt
+  checksum: 10c0/127c94699f07eab5fbbb89d600c3f0e36ae6fd001e028139740b41fffb62a23a2743523fb88f442ae3308a27d4843b97ccb9e436d78f5c5899be187d0972c6d5
+  languageName: node
+  linkType: hard
+
+"bcryptjs@npm:^2.4.3":
+  version: 2.4.3
+  resolution: "bcryptjs@npm:2.4.3"
+  checksum: 10c0/b969467087ed7a01ff905a1c6a0c45014ec586248a448ea08370c8ed8bb314bda16a870ca23e0961d7d23bdce1a04c76fa70a9d680be814fa9ac7d8fc61870a3
   languageName: node
   linkType: hard
 
@@ -2300,7 +2394,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"chalk@npm:^2.0.0":
+"chalk@npm:^2.0.0, chalk@npm:^2.4.1":
   version: 2.4.2
   resolution: "chalk@npm:2.4.2"
   dependencies:
@@ -3845,73 +3939,6 @@ __metadata:
   languageName: node
   linkType: hard
 
-"frappe-books@workspace:.":
-  version: 0.0.0-use.local
-  resolution: "frappe-books@workspace:."
-  dependencies:
-    "@codemirror/autocomplete": "npm:^6.4.2"
-    "@codemirror/lang-vue": "npm:^0.1.1"
-    "@codemirror/language": "npm:^6.0.0"
-    "@codemirror/state": "npm:^6.0.0"
-    "@codemirror/view": "npm:^6.0.0"
-    "@electron/rebuild": "npm:^3.4.1"
-    "@lezer/common": "npm:^1.0.0"
-    "@popperjs/core": "npm:^2.10.2"
-    "@types/assert": "npm:^1.5.6"
-    "@types/better-sqlite3": "npm:^7.6.4"
-    "@types/electron-devtools-installer": "npm:^2.2.0"
-    "@types/lodash": "npm:^4.14.179"
-    "@types/luxon": "npm:^2.3.1"
-    "@types/node": "npm:^17.0.23"
-    "@types/node-fetch": "npm:^2.6.1"
-    "@types/tape": "npm:^4.13.2"
-    "@typescript-eslint/eslint-plugin": "npm:5.60.0"
-    "@typescript-eslint/parser": "npm:5.60.0"
-    "@vitejs/plugin-vue": "npm:^4.2.3"
-    autoprefixer: "npm:^9"
-    better-sqlite3: "npm:^9.2.2"
-    bree: "npm:^9.2.4"
-    chokidar: "npm:^3.5.3"
-    codemirror: "npm:^6.0.1"
-    core-js: "npm:^3.19.0"
-    dotenv: "npm:^16.0.0"
-    electron: "npm:22.3.27"
-    electron-builder: "npm:^24.9.1"
-    electron-devtools-installer: "npm:^3.2.0"
-    electron-store: "npm:^8.0.1"
-    electron-updater: "npm:^6.3.0"
-    eslint: "npm:^8.43.0"
-    eslint-config-prettier: "npm:^8.3.0"
-    eslint-plugin-prettier: "npm:^4.0.0"
-    eslint-plugin-vue: "npm:^9.15.0"
-    execa: "npm:^7.1.1"
-    feather-icons: "npm:^4.28.0"
-    fs-extra: "npm:^11.1.1"
-    knex: "npm:^2.4.0"
-    lodash: "npm:^4.17.21"
-    luxon: "npm:^2.5.2"
-    node-fetch: "npm:2"
-    pesa: "npm:^1.1.12"
-    playwright: "npm:^1.55.1"
-    postcss: "npm:^8"
-    prettier: "npm:^2.4.1"
-    source-map-support: "npm:^0.5.21"
-    tailwindcss: "npm:@tailwindcss/postcss7-compat"
-    tailwindcss-rtl: "npm:^0.9.0"
-    tap-spec: "npm:^5.0.0"
-    tape: "npm:^5.6.1"
-    ts-node: "npm:^10.7.0"
-    tsconfig-paths: "npm:^3.14.1"
-    tslib: "npm:^2.3.1"
-    typescript: "npm:^4.6.2"
-    vite: "npm:^5.4.21"
-    vue: "npm:^3.2.40"
-    vue-router: "npm:^4.0.12"
-    vue-tsc: "npm:^1.6.5"
-    yargs: "npm:^17.7.2"
-  languageName: unknown
-  linkType: soft
-
 "fs-constants@npm:^1.0.0":
   version: 1.0.0
   resolution: "fs-constants@npm:1.0.0"
@@ -4174,6 +4201,20 @@ __metadata:
   languageName: node
   linkType: hard
 
+"glob@npm:^7.1.2, glob@npm:^7.1.6, glob@npm:^7.2.3":
+  version: 7.2.3
+  resolution: "glob@npm:7.2.3"
+  dependencies:
+    fs.realpath: "npm:^1.0.0"
+    inflight: "npm:^1.0.4"
+    inherits: "npm:2"
+    minimatch: "npm:^3.1.1"
+    once: "npm:^1.3.0"
+    path-is-absolute: "npm:^1.0.0"
+  checksum: 10c0/65676153e2b0c9095100fe7f25a778bf45608eeb32c6048cf307f579649bcc30353277b3b898a3792602c65764e5baa4f643714dfbdfd64ea271d210c7a425fe
+  languageName: node
+  linkType: hard
+
 "glob@npm:^7.1.3, glob@npm:^7.1.4, glob@npm:^7.1.7":
   version: 7.2.0
   resolution: "glob@npm:7.2.0"
@@ -4185,20 +4226,6 @@ __metadata:
     once: "npm:^1.3.0"
     path-is-absolute: "npm:^1.0.0"
   checksum: 10c0/478b40e38be5a3d514e64950e1e07e0ac120585add6a37c98d0ed24d72d9127d734d2a125786073c8deb687096e84ae82b641c441a869ada3a9cc91b68978632
-  languageName: node
-  linkType: hard
-
-"glob@npm:^7.1.6, glob@npm:^7.2.3":
-  version: 7.2.3
-  resolution: "glob@npm:7.2.3"
-  dependencies:
-    fs.realpath: "npm:^1.0.0"
-    inflight: "npm:^1.0.4"
-    inherits: "npm:2"
-    minimatch: "npm:^3.1.1"
-    once: "npm:^1.3.0"
-    path-is-absolute: "npm:^1.0.0"
-  checksum: 10c0/65676153e2b0c9095100fe7f25a778bf45608eeb32c6048cf307f579649bcc30353277b3b898a3792602c65764e5baa4f643714dfbdfd64ea271d210c7a425fe
   languageName: node
   linkType: hard
 
@@ -6054,7 +6081,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"object-assign@npm:^4.1.0":
+"object-assign@npm:^4.1.0, object-assign@npm:^4.1.1":
   version: 4.1.1
   resolution: "object-assign@npm:4.1.1"
   checksum: 10c0/1f4df9945120325d041ccf7b86f31e8bcc14e73d29171e37a7903050e96b81323784ec59f93f102ec635bcf6fa8034ba3ea0a8c7e69fa202b87ae3b6cec5a414
@@ -6465,13 +6492,25 @@ __metadata:
   languageName: node
   linkType: hard
 
-"postcss-js@npm:^3.0.3":
-  version: 3.0.3
-  resolution: "postcss-js@npm:3.0.3"
+"postcss-functions@npm:^3":
+  version: 3.0.0
+  resolution: "postcss-functions@npm:3.0.0"
+  dependencies:
+    glob: "npm:^7.1.2"
+    object-assign: "npm:^4.1.1"
+    postcss: "npm:^6.0.9"
+    postcss-value-parser: "npm:^3.3.0"
+  checksum: 10c0/8f47c51ce66fa6da666a86f10736133f9c31c8cd8ff872f184ff694b682d5cd37560e4fe8e3c8ca6896278e05b35426183bbd9afd3a25e6f3e5bc32ecc8909bc
+  languageName: node
+  linkType: hard
+
+"postcss-js@npm:^2":
+  version: 2.0.3
+  resolution: "postcss-js@npm:2.0.3"
   dependencies:
     camelcase-css: "npm:^2.0.1"
-    postcss: "npm:^8.1.6"
-  checksum: 10c0/bb569feb35bc4029072c259f52af4bf7b79e5dc2c680e3d6c7cedbb2b8d05114186832bef169abb76d601b75f83952fe0bb8c56b7c071d8f34c6ad8a0aead614
+    postcss: "npm:^7.0.18"
+  checksum: 10c0/920905b836f75539479f13556d09972c6c43f2db8ea6db625fec870b85da2505e9664fe722b609fc07aeb236e3350c764df82f53c7c7e22e78dc7ac675c283d7
   languageName: node
   linkType: hard
 
@@ -6490,14 +6529,23 @@ __metadata:
   languageName: node
   linkType: hard
 
-"postcss-nested@npm:5.0.6":
-  version: 5.0.6
-  resolution: "postcss-nested@npm:5.0.6"
+"postcss-nested@npm:^4":
+  version: 4.2.3
+  resolution: "postcss-nested@npm:4.2.3"
   dependencies:
-    postcss-selector-parser: "npm:^6.0.6"
-  peerDependencies:
-    postcss: ^8.2.14
-  checksum: 10c0/cff4f05b06ec752a90a36b329b4c1b620352458b3d8e02e2fc7efdfb5073945242573ec42c0dd2b7c4beccba21233e5f089903c3e5e8aea2bbceca09c406fb8f
+    postcss: "npm:^7.0.32"
+    postcss-selector-parser: "npm:^6.0.2"
+  checksum: 10c0/04351ad60e7816178df0aebba1e6fc92de311d5cf66a1464d164c6436673561dadf55cedbe9d511ffa854f0eeae638f88d03d2ce8f2ce35e21cc0a7fa0528390
+  languageName: node
+  linkType: hard
+
+"postcss-selector-parser@npm:^6.0.2":
+  version: 6.1.2
+  resolution: "postcss-selector-parser@npm:6.1.2"
+  dependencies:
+    cssesc: "npm:^3.0.0"
+    util-deprecate: "npm:^1.0.2"
+  checksum: 10c0/523196a6bd8cf660bdf537ad95abd79e546d54180f9afb165a4ab3e651ac705d0f8b8ce6b3164fb9e3279ce482c5f751a69eb2d3a1e8eb0fd5e82294fb3ef13e
   languageName: node
   linkType: hard
 
@@ -6535,7 +6583,18 @@ __metadata:
   languageName: node
   linkType: hard
 
-"postcss@npm:^7.0.32":
+"postcss@npm:^6.0.9":
+  version: 6.0.23
+  resolution: "postcss@npm:6.0.23"
+  dependencies:
+    chalk: "npm:^2.4.1"
+    source-map: "npm:^0.6.1"
+    supports-color: "npm:^5.4.0"
+  checksum: 10c0/45d45184ffbb9d510e7585d9441af9a1a771a56b7553b1d598544e54acdfd31df439a95d5f00a6dc57b85b76d0c8925fec18614b1cc795887c845c3965e32e63
+  languageName: node
+  linkType: hard
+
+"postcss@npm:^7, postcss@npm:^7.0.18, postcss@npm:^7.0.32":
   version: 7.0.39
   resolution: "postcss@npm:7.0.39"
   dependencies:
@@ -6545,7 +6604,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"postcss@npm:^8, postcss@npm:^8.1.10, postcss@npm:^8.1.6, postcss@npm:^8.3.5, postcss@npm:^8.4.43":
+"postcss@npm:^8, postcss@npm:^8.1.10, postcss@npm:^8.3.5, postcss@npm:^8.4.43":
   version: 8.5.6
   resolution: "postcss@npm:8.5.6"
   dependencies:
@@ -7574,7 +7633,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"supports-color@npm:^5.3.0":
+"supports-color@npm:^5.3.0, supports-color@npm:^5.4.0":
   version: 5.5.0
   resolution: "supports-color@npm:5.5.0"
   dependencies:
@@ -7606,11 +7665,12 @@ __metadata:
   languageName: node
   linkType: hard
 
-"tailwindcss@npm:@tailwindcss/postcss7-compat":
+"tailwindcss@npm:@tailwindcss/postcss7-compat@2.2.17":
   version: 2.2.17
-  resolution: "tailwindcss@npm:2.2.17"
+  resolution: "@tailwindcss/postcss7-compat@npm:2.2.17"
   dependencies:
     arg: "npm:^5.0.1"
+    autoprefixer: "npm:^9"
     bytes: "npm:^3.0.0"
     chalk: "npm:^4.1.2"
     chokidar: "npm:^3.5.2"
@@ -7631,9 +7691,11 @@ __metadata:
     node-emoji: "npm:^1.11.0"
     normalize-path: "npm:^3.0.0"
     object-hash: "npm:^2.2.0"
-    postcss-js: "npm:^3.0.3"
+    postcss: "npm:^7"
+    postcss-functions: "npm:^3"
+    postcss-js: "npm:^2"
     postcss-load-config: "npm:^3.1.0"
-    postcss-nested: "npm:5.0.6"
+    postcss-nested: "npm:^4"
     postcss-selector-parser: "npm:^6.0.6"
     postcss-value-parser: "npm:^4.1.0"
     pretty-hrtime: "npm:^1.0.3"
@@ -7642,13 +7704,10 @@ __metadata:
     reduce-css-calc: "npm:^2.1.8"
     resolve: "npm:^1.20.0"
     tmp: "npm:^0.2.1"
-  peerDependencies:
-    autoprefixer: ^10.0.2
-    postcss: ^8.0.9
   bin:
     tailwind: lib/cli.js
     tailwindcss: lib/cli.js
-  checksum: 10c0/787c69db02d03da9ea0a586ce808ba3e50ff8d85b55d867d39ba37a3c628ade8d3c8860c31a522263e03ab42024f8602783cdba1d5cf0e2fcd6f8272266c6c53
+  checksum: 10c0/f6a6e14c3f72001876ba78a297bbe0a209eb2f75f38b4a0562a16f257151ac8f4467f5ca495e38e46731fde9b6c2c6dac3dc5fc5de986ad0566ba29011158293
   languageName: node
   linkType: hard
 

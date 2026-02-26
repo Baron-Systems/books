@@ -99,7 +99,9 @@ export class DocHandler {
     }
 
     const doc = new Model!(schema, data, this.fyo, isRawValueMap);
-    doc.name ??= this.getTemporaryName(schema);
+    doc.name ??= schema.isChild
+      ? getRandomString()
+      : this.getTemporaryName(schema);
     if (cacheDoc) {
       this.#addToCache(doc);
     }

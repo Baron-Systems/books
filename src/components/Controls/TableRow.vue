@@ -1,7 +1,7 @@
 <template>
   <Row
     :ratio="ratio"
-    class="w-full px-2 group flex items-center justify-center h-row-mid"
+    class="w-full px-2 py-1 group flex items-center justify-center min-h-[2.5rem]"
     :class="readOnly ? '' : 'hover:bg-gray-25 dark:hover:bg-gray-900'"
   >
     <!-- Index or Remove button -->
@@ -10,14 +10,14 @@
       @mouseenter="isRowIndexVisible = false"
       @mouseleave="isRowIndexVisible = true"
     >
-      <span class="relative w-4 h-4 flex items-center justify-center">
+      <span class="relative w-5 h-5 flex items-center justify-center flex-shrink-0">
         <feather-icon
           v-if="!readOnly && !isRowIndexVisible"
           name="x"
           class="
-            w-4
-            h-4
-            -ms-1
+            w-5
+            h-5
+            -ms-0.5
             cursor-pointer
             rounded
             focus:outline-none focus:ring-2 focus:ring-blue-500 focus:bg-blue-50
@@ -60,17 +60,20 @@
       </span>
     </div>
 
-    <!-- Data Input Form Control -->
-    <FormControl
-      v-for="(df, i) in tableFields"
-      :key="df.fieldname"
-      :size="size"
-      :df="df"
-      :value="row[df.fieldname]"
-      @change="(value) => onChange(df, value)"
-      @focus="onFieldFocus(i)"
-      @blur="onFieldBlur(i)"
-    />
+    <!-- Data Input Form Control (no label in cells; header has column labels) -->
+    <template v-for="(df, i) in tableFields" :key="df.fieldname">
+      <FormControl
+        v-if="!isFieldHidden(df)"
+        :size="size"
+        :show-label="false"
+        :df="df"
+        :value="row[df.fieldname]"
+        @change="(value) => onChange(df, value)"
+        @focus="onFieldFocus(i)"
+        @blur="onFieldBlur(i)"
+      />
+      <div v-else class="flex items-center min-h-[2.5rem]" />
+    </template>
     <Button
       v-if="canEditRow"
       :icon="true"
@@ -80,7 +83,7 @@
     >
       <feather-icon
         name="edit"
-        class="w-4 h-4 text-gray-600 dark:text-gray-400"
+        class="w-5 h-5 text-gray-600 dark:text-gray-400 flex-shrink-0"
       />
     </Button>
 
@@ -98,6 +101,7 @@
 import { Doc } from 'fyo/model/doc';
 import Row from 'src/components/Row.vue';
 import { getErrorMessage } from 'src/utils';
+import { evaluateHidden } from 'src/utils/doc';
 import { computed, nextTick } from 'vue';
 import Button from '../Button.vue';
 import FormControl from './FormControl.vue';
@@ -140,6 +144,9 @@ export default {
     this.$options.components.FormControl = FormControl;
   },
   methods: {
+    isFieldHidden(df) {
+      return evaluateHidden(df, this.row);
+    },
     async onChange(df, value) {
       const fieldname = df.fieldname;
       this.errors[fieldname] = null;

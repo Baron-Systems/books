@@ -9,18 +9,20 @@
     <div class="row-start-6 grid grid-cols-2 gap-4 mt-auto pb-6">
       <div class="flex col-span-2 gap-5">
         <Button
-          class="py-5 w-full bg-red-500 dark:bg-red-700"
+          type="secondary"
+          class="py-5 w-full"
           @click="$emit('toggleModal', 'Alert')"
         >
           <slot>
-            <p class="uppercase text-lg text-white font-semibold">
+            <p class="uppercase text-lg font-semibold">
               {{ t`Cancel` }}
             </p>
           </slot>
         </Button>
 
         <Button
-          class="w-full py-5 bg-green-500 dark:bg-green-700"
+          type="primary"
+          class="w-full py-5"
           @click="
             routeTo('/list/SalesInvoice');
             $emit('toggleModal', 'Alert');
@@ -35,7 +37,8 @@
       </div>
       <div class="col-span-2 flex justify-center mt-3">
         <Button
-          class="w-full py-5 bg-blue-500 dark:bg-blue-700"
+          type="primary"
+          class="w-full py-5"
           @click="$emit('saveAndContinue')"
         >
           <slot>

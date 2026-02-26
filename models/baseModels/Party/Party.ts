@@ -26,30 +26,56 @@ export class Party extends Doc {
     /**
      * If Role === "Both" then outstanding Amount
      * will be the amount to be paid to the party.
+     * Unallocated payment (Customer Credit / Vendor Advance) reduces outstanding.
      */
 
     const role = this.role as PartyRole;
     let outstandingAmount = this.fyo.pesa(0);
 
-    if (role === 'Customer' || role === 'Both') {
+    if (role === 'Customer') {
       const outstandingReceive = await this._getTotalOutstandingAmount(
         'SalesInvoice'
       );
-      outstandingAmount = outstandingAmount.add(outstandingReceive);
+      const openingReceive = await this._getOpeningEntryOutstandingAmount(
+        'Receivable'
+      );
+      const unallocatedReceive = await this._getUnallocatedPaymentTotal(
+        'Receive'
+      );
+      outstandingAmount = outstandingAmount.add(
+        outstandingReceive.add(openingReceive).sub(unallocatedReceive)
+      );
     }
 
     if (role === 'Supplier') {
       const outstandingPay = await this._getTotalOutstandingAmount(
         'PurchaseInvoice'
       );
-      outstandingAmount = outstandingAmount.add(outstandingPay);
+      const openingPay = await this._getOpeningEntryOutstandingAmount('Payable');
+      const unallocatedPay = await this._getUnallocatedPaymentTotal('Pay');
+      outstandingAmount = outstandingAmount.add(
+        outstandingPay.add(openingPay).sub(unallocatedPay)
+      );
     }
 
     if (role === 'Both') {
+      const outstandingReceive = await this._getTotalOutstandingAmount(
+        'SalesInvoice'
+      );
       const outstandingPay = await this._getTotalOutstandingAmount(
         'PurchaseInvoice'
       );
-      outstandingAmount = outstandingAmount.sub(outstandingPay);
+      const openingReceive = await this._getOpeningEntryOutstandingAmount(
+        'Receivable'
+      );
+      const openingPay = await this._getOpeningEntryOutstandingAmount('Payable');
+      const unallocatedReceive = await this._getUnallocatedPaymentTotal(
+        'Receive'
+      );
+      const unallocatedPay = await this._getUnallocatedPaymentTotal('Pay');
+      outstandingAmount = outstandingAmount
+        .add(outstandingReceive.add(openingReceive).sub(unallocatedReceive))
+        .sub(outstandingPay.add(openingPay).sub(unallocatedPay));
     }
 
     await this.setAndSync({ outstandingAmount });
@@ -108,21 +134,175 @@ export class Party extends Doc {
       .reduce((a, b) => a.add(b), this.fyo.pesa(0));
   }
 
+  /**
+   * Net party amount from submitted, non-cancelled Opening Entry journal rows
+   * posted to party control accounts.
+   *
+   * Receivable: debit - credit (customer due increases on debit)
+   * Payable: credit - debit (supplier due increases on credit)
+   */
+  async _getOpeningEntryOutstandingAmount(
+    accountType: 'Receivable' | 'Payable'
+  ): Promise<Money> {
+    const openingEntries = (await this.fyo.db.getAllRaw('JournalEntry', {
+      fields: ['name'],
+      filters: {
+        submitted: true,
+        cancelled: false,
+        entryType: 'Opening Entry',
+      },
+    })) as { name: string }[];
+
+    if (!openingEntries.length) {
+      return this.fyo.pesa(0);
+    }
+
+    const openingNames = openingEntries.map((e) => e.name);
+    const ledgerRows = (await this.fyo.db.getAllRaw('AccountingLedgerEntry', {
+      fields: ['account', 'debit', 'credit'],
+      filters: {
+        party: this.name as string,
+        referenceType: 'JournalEntry',
+        referenceName: ['in', openingNames],
+        reverted: false,
+      },
+    })) as {
+      account: string;
+      debit: string | number;
+      credit: string | number;
+    }[];
+
+    if (!ledgerRows.length) {
+      return this.fyo.pesa(0);
+    }
+
+    const accountNames = [...new Set(ledgerRows.map((r) => r.account).filter(Boolean))];
+    if (!accountNames.length) {
+      return this.fyo.pesa(0);
+    }
+
+    const controlAccounts = (await this.fyo.db.getAllRaw('Account', {
+      fields: ['name'],
+      filters: {
+        name: ['in', accountNames],
+        isGroup: false,
+        accountType,
+      },
+    })) as { name: string }[];
+
+    if (!controlAccounts.length) {
+      return this.fyo.pesa(0);
+    }
+
+    const controlAccountSet = new Set(controlAccounts.map((a) => a.name));
+    return ledgerRows.reduce((sum, row) => {
+      if (!controlAccountSet.has(row.account)) {
+        return sum;
+      }
+      const debit = this.fyo.pesa(row.debit ?? 0);
+      const credit = this.fyo.pesa(row.credit ?? 0);
+      return accountType === 'Receivable'
+        ? sum.add(debit.sub(credit))
+        : sum.add(credit.sub(debit));
+    }, this.fyo.pesa(0));
+  }
+
+  /**
+   * Sum of (payment.amount - sum(payment for.amount)) for submitted, non-cancelled Payment.
+   * Customer Credit (Receive) or Vendor Advance (Pay) — reduces party outstanding.
+   */
+  async _getUnallocatedPaymentTotal(
+    paymentType: 'Receive' | 'Pay'
+  ): Promise<Money> {
+    const list = await this.getPaymentsWithUnallocatedAmount(paymentType);
+    return list.reduce(
+      (sum, p) => sum.add(p.unallocated),
+      this.fyo.pesa(0)
+    );
+  }
+
+  /**
+   * Returns submitted, non-cancelled Payment docs for this party with the given paymentType,
+   * each with its unallocated amount (payment.amount - sum(for.amount)), ordered by date ASC (oldest first).
+   * Used for Automatic Balance Adjustment when allocating customer credit / vendor advance to a new invoice.
+   */
+  async getPaymentsWithUnallocatedAmount(
+    paymentType: 'Receive' | 'Pay'
+  ): Promise<{ name: string; unallocated: Money }[]> {
+    const payments = (await this.fyo.db.getAllRaw('Payment', {
+      fields: ['name', 'amount', 'date'],
+      filters: {
+        party: this.name as string,
+        paymentType,
+        submitted: true,
+        cancelled: false,
+      },
+      orderBy: 'date',
+      order: 'asc',
+    })) as { name: string; amount: string | number; date: string }[];
+
+    const result: { name: string; unallocated: Money }[] = [];
+    for (const p of payments) {
+      const paymentAmount = this.fyo.pesa(p.amount);
+      const forRows = (await this.fyo.db.getAllRaw('PaymentFor', {
+        fields: ['amount'],
+        filters: { parent: p.name },
+      })) as { amount: string | number }[];
+      const allocated = forRows.reduce(
+        (sum, r) => sum.add(this.fyo.pesa(r.amount)),
+        this.fyo.pesa(0)
+      );
+      const unallocated = paymentAmount.sub(allocated);
+      if (unallocated.gt(0)) {
+        result.push({ name: p.name, unallocated });
+      }
+    }
+    return result;
+  }
+
   formulas: FormulaMap = {
     defaultAccount: {
       formula: async () => {
+        if (this.defaultAccount) {
+          return this.defaultAccount;
+        }
+
         const role = this.role as PartyRole;
         if (role === 'Both') {
           return '';
         }
 
-        let accountName = 'Debtors';
-        if (role === 'Supplier') {
-          accountName = 'Creditors';
+        const preferredNames =
+          role === 'Supplier'
+            ? ['Creditors', 'الدائنون', 'الدائنين']
+            : ['Debtors', 'المدينون', 'المدينين'];
+
+        for (const accountName of preferredNames) {
+          const accountExists = await this.fyo.db.exists('Account', accountName);
+          if (accountExists) {
+            return accountName;
+          }
         }
 
-        const accountExists = await this.fyo.db.exists('Account', accountName);
-        return accountExists ? accountName : '';
+        const accountType = role === 'Customer' ? 'Receivable' : 'Payable';
+        const controlAccounts = (await this.fyo.db.getAll('Account', {
+          fields: ['name'],
+          filters: {
+            isGroup: false,
+            accountType,
+          },
+        })) as { name?: string }[];
+
+        const preferredByName = controlAccounts.find((acc) =>
+          role === 'Supplier'
+            ? /(credit|payable|دائن)/i.test(acc.name as string)
+            : /(debt|receivable|مدين)/i.test(acc.name as string)
+        );
+        if (preferredByName?.name) {
+          return preferredByName.name;
+        }
+
+        return controlAccounts[0]?.name ?? '';
       },
       dependsOn: ['role'],
     },

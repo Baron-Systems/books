@@ -21,7 +21,8 @@ export class PaymentFor extends Doc {
           return;
         }
 
-        const party = await this.parentdoc?.loadAndGetLink('party');
+        const parent = this.parentdoc;
+        const party = await parent?.loadAndGetLink('party');
         if (!party) {
           return ModelNameEnum.SalesInvoice;
         }
@@ -30,8 +31,19 @@ export class PaymentFor extends Doc {
           return ModelNameEnum.PurchaseInvoice;
         }
 
+        if (party.role === PartyRoleEnum.Both) {
+          if (parent?.paymentType === 'Pay') {
+            return ModelNameEnum.PurchaseInvoice;
+          }
+          if (parent?.paymentType === 'Receive') {
+            return ModelNameEnum.SalesInvoice;
+          }
+          return;
+        }
+
         return ModelNameEnum.SalesInvoice;
       },
+      dependsOn: ['parentdoc'],
     },
     referenceName: {
       formula: async () => {

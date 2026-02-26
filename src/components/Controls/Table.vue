@@ -4,7 +4,44 @@
       {{ df.label }}
     </div>
 
-    <div :class="border ? 'border dark:border-gray-800 rounded-md' : ''">
+    <!-- Search for tables with many rows (e.g. Price List items) -->
+    <div
+      v-if="isSearchable && value?.length > 3"
+      class="flex items-center gap-2 mb-2"
+    >
+      <feather-icon
+        name="search"
+        class="w-4 h-4 text-gray-500 dark:text-gray-400 flex-shrink-0"
+      />
+      <input
+        v-model="tableSearchQuery"
+        type="search"
+        :placeholder="t`Search items...`"
+        class="
+          flex-1
+          min-w-0
+          px-3
+          py-1.5
+          rounded-lg
+          border
+          app-border
+          bg-gray-50
+          dark:bg-gray-890
+          text-sm
+          text-gray-900
+          dark:text-gray-100
+          placeholder-gray-500
+          focus:outline-none
+          focus:ring-1
+          focus:ring-primary
+        "
+      />
+    </div>
+
+    <div
+      :class="border ? 'border dark:border-gray-800 rounded-md' : ''"
+      :style="tableWrapperStyle"
+    >
       <!-- Title Row -->
       <Row
         :ratio="ratio"
@@ -12,6 +49,7 @@
           border-b
           dark:border-gray-800
           px-2
+          py-1
           text-gray-600
           dark:text-gray-400
           w-full
@@ -23,7 +61,7 @@
         <div
           v-for="df in tableFields"
           :key="df.fieldname"
-          class="items-center px-2 h-row-mid"
+          class="items-center px-2 min-h-[2.25rem]"
           :class="{
             'ms-auto': isNumeric(df),
           }"
@@ -38,15 +76,15 @@
 
       <!-- Data Rows -->
       <div
-        v-if="value"
+        v-if="displayValue"
         class="overflow-auto custom-scroll custom-scroll-thumb1"
         :style="{ 'max-height': maxHeight }"
       >
         <TableRow
-          v-for="(row, idx) of value"
+          v-for="(row, idx) of displayValue"
           ref="table-row"
           :key="row.name"
-          :class="idx < value.length - 1 ? 'border-b dark:border-gray-800' : ''"
+          :class="idx < displayValue.length - 1 ? 'border-b dark:border-gray-800' : ''"
           v-bind="{ row, tableFields, size, ratio, isNumeric }"
           :read-only="isReadOnly"
           :can-edit-row="canEditRow"
@@ -63,19 +101,20 @@
           text-gray-500
           cursor-pointer
           px-2
+          py-1.5
           w-full
-          h-row-mid
+          min-h-[2.5rem]
           flex
           items-center
           focus:outline-none focus:ring-1 focus:ring-blue-500
         "
-        :class="value.length > 0 ? 'border-t dark:border-gray-800' : ''"
+        :class="displayValue.length > 0 ? 'border-t dark:border-gray-800' : ''"
         tabindex="0"
         @click="addRow"
         @keydown.enter="addRow"
       >
         <div class="flex items-center ps-1">
-          <feather-icon name="plus" class="w-4 h-4 text-gray-500" />
+          <feather-icon name="plus" class="w-5 h-5 text-gray-500 flex-shrink-0" />
         </div>
         <div
           class="flex justify-between px-2"
@@ -86,13 +125,13 @@
           </p>
           <p
             v-if="
-              value &&
+              displayValue &&
               maxRowsBeforeOverflow &&
-              value.length > maxRowsBeforeOverflow
+              displayValue.length > maxRowsBeforeOverflow
             "
             class="text-end px-2"
           >
-            {{ t`${value.length} rows` }}
+            {{ t`${displayValue.length} rows` }}
           </p>
         </div>
       </Row>
@@ -122,7 +161,7 @@ export default {
     },
     maxRowsBeforeOverflow: {
       type: Number,
-      default: 3,
+      default: 0,
     },
     border: {
       type: Boolean,
@@ -131,9 +170,32 @@ export default {
   },
   emits: ['editrow', 'row-change'],
   data() {
-    return { maxHeight: '' };
+    return { maxHeight: '', tableSearchQuery: '' };
   },
   computed: {
+    isSearchable() {
+      return this.df?.target === 'PriceListItem';
+    },
+    effectiveMaxRowsBeforeOverflow() {
+      return this.maxRowsBeforeOverflow;
+    },
+    displayValue() {
+      const rows = this.value ?? [];
+      if (!this.isSearchable || !this.tableSearchQuery?.trim()) {
+        return rows;
+      }
+      const q = this.tableSearchQuery.trim().toLowerCase();
+      const fields = this.tableFields?.map((f) => f.fieldname) ?? [];
+      return rows.filter((row) => {
+        for (const fieldname of fields) {
+          const val = row[fieldname];
+          if (val != null && String(val).toLowerCase().includes(q)) {
+            return true;
+          }
+        }
+        return false;
+      });
+    },
     height() {
       if (this.size === 'small') {
       }
@@ -152,12 +214,26 @@ export default {
       return ratio;
     },
     tableFields() {
-      const fields = fyo.schemaMap[this.df.target].tableFields ?? [];
+      const schema = fyo.schemaMap[this.df.target];
+      if (!schema) {
+        return [];
+      }
+      const fields = schema.tableFields ?? [];
       return fields.map((fieldname) => fyo.getField(this.df.target, fieldname));
+    },
+    tableWrapperStyle() {
+      const colCount = this.tableFields?.length ?? 0;
+      if (colCount >= 6) {
+        return { minWidth: '880px' };
+      }
+      return {};
     },
   },
   watch: {
     value() {
+      this.setMaxHeight();
+    },
+    tableSearchQuery() {
       this.setMaxHeight();
     },
   },
@@ -172,7 +248,7 @@ export default {
     async addRow() {
       await this.doc.append(this.df.fieldname);
       await nextTick();
-      this.scrollToRow(this.value.length - 1);
+      this.scrollToRow((this.displayValue ?? []).length - 1);
       this.triggerChange(this.value);
       this.$nextTick(() => {
         const rows = this.$refs['table-row'];
@@ -199,11 +275,11 @@ export default {
     },
 
     setMaxHeight() {
-      if (this.maxRowsBeforeOverflow === 0) {
+      if (this.effectiveMaxRowsBeforeOverflow === 0) {
         return (this.maxHeight = '');
       }
 
-      const size = this?.value?.length ?? 0;
+      const size = this?.displayValue?.length ?? 0;
       if (size === 0) {
         return (this.maxHeight = '');
       }
@@ -213,7 +289,8 @@ export default {
         return (this.maxHeight = '');
       }
 
-      const maxHeight = rowHeight * Math.min(this.maxRowsBeforeOverflow, size);
+      const maxHeight =
+        rowHeight * Math.min(this.effectiveMaxRowsBeforeOverflow, size);
       return (this.maxHeight = `${maxHeight}px`);
     },
   },

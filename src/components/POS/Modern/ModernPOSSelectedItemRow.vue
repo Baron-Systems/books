@@ -29,16 +29,18 @@
     </p>
   </div>
 
-  <Int
+  <Float
     :df="{
       fieldname: 'quantity',
-      fieldtype: 'Int',
+      fieldtype: 'Float',
       label: t`Quantity`,
     }"
     size="small"
     :border="false"
+    :min="0"
     :value="row.quantity"
-    :read-only="true"
+    :read-only="isReadOnly"
+    @change="(value: number) => setQuantity(Number(value))"
   />
 
   <Currency
@@ -95,19 +97,21 @@
       </div>
 
       <div class="px-4 col-span-2">
-        <Link
-          v-if="isUOMConversionEnabled"
+        <AutoComplete
+          v-if="isUOMConversionEnabled && transferUnitOptions.length"
+          :key="row.item"
           :df="{
+            fieldtype: 'AutoComplete',
             fieldname: 'transferUnit',
-            fieldtype: 'Link',
-            target: 'UOM',
             label: t`Transfer Unit`,
+            options: transferUnitOptions,
           }"
           size="medium"
           :show-label="true"
           :border="true"
-          :value="row.transferUnit"
+          :value="row.transferUnit ?? ''"
           :read-only="isReadOnly"
+          @change="(value: string) => setTransferUnit(value)"
         />
       </div>
 
@@ -243,16 +247,21 @@ import Float from 'src/components/Controls/Float.vue';
 import Int from 'src/components/Controls/Int.vue';
 import Link from 'src/components/Controls/Link.vue';
 import Text from 'src/components/Controls/Text.vue';
+import AutoComplete from 'src/components/Controls/AutoComplete.vue';
 import { inject } from 'vue';
 import { fyo } from 'src/initFyo';
 import { defineComponent } from 'vue';
 import { SalesInvoiceItem } from 'models/baseModels/SalesInvoiceItem/SalesInvoiceItem';
+import { SalesInvoice } from 'models/baseModels/SalesInvoice/SalesInvoice';
+import { InvoiceItem } from 'models/baseModels/InvoiceItem/InvoiceItem';
 import { Money } from 'pesa';
+import { validateQty } from 'models/helpers';
+import { showToast } from 'src/utils/interactive';
 import { validateSerialNumberCount } from 'src/utils/pos';
 
 export default defineComponent({
   name: 'ModernPOSSelectedItemRow',
-  components: { Currency, Data, Float, Int, Link, Text },
+  components: { Currency, Data, Float, Int, Link, Text, AutoComplete },
   props: {
     row: { type: SalesInvoiceItem, required: true },
     batchAdded: { type: Boolean, default: false },
@@ -275,6 +284,7 @@ export default defineComponent({
       itemVisibility: '',
 
       defaultRate: this.row.rate as Money,
+      transferUnitOptions: [] as Array<{ label: string; value: string }>,
     };
   },
   watch: {
@@ -283,6 +293,16 @@ export default defineComponent({
         if (newBatch) {
           this.availableQtyInBatch = await this.getAvailableQtyInBatch();
           this.isExapanded = true;
+        }
+      },
+      immediate: true,
+    },
+    'row.item': {
+      async handler(newItem) {
+        if (newItem) {
+          await this.updateTransferUnitOptions();
+        } else {
+          this.transferUnitOptions = [];
         }
       },
       immediate: true,
@@ -327,6 +347,44 @@ export default defineComponent({
       this.row.set('batch', batch);
       this.availableQtyInBatch = await this.getAvailableQtyInBatch();
     },
+    async updateTransferUnitOptions() {
+      if (!this.row.item) {
+        this.transferUnitOptions = [];
+        return;
+      }
+
+      const itemDoc = await fyo.doc.getDoc('Item', this.row.item as string);
+
+      const conversions = (itemDoc?.uomConversions ?? []) as Array<{
+        uom: string;
+        conversionFactor: number;
+      }>;
+
+      const allowedUoms = new Set<string>();
+
+      if (typeof itemDoc?.unit === 'string') {
+        allowedUoms.add(itemDoc.unit);
+      }
+
+      for (const c of conversions) {
+        if (typeof c.uom === 'string') {
+          allowedUoms.add(c.uom);
+        }
+      }
+
+      this.transferUnitOptions = [...allowedUoms].map((uom) => ({
+        label: uom,
+        value: uom,
+      }));
+    },
+    async setTransferUnit(value: string) {
+      if (this.isReadOnly) {
+        return;
+      }
+      await this.row.set('transferUnit', value);
+      this.$emit('applyPricingRule');
+      this.$emit('runSinvFormulas');
+    },
     setSerialNumber(serialNumber: string) {
       if (!serialNumber) {
         return;
@@ -344,6 +402,65 @@ export default defineComponent({
 
       if (!row.isFreeItem) {
         this.$emit('applyPricingRule');
+      }
+    },
+    async setQuantity(quantity: number) {
+      if (this.isReadOnly) {
+        return;
+      }
+      const hasManualDiscount = this.row.setItemDiscountAmount;
+      const isPercentageDiscount =
+        !hasManualDiscount && this.row.itemDiscountPercent !== 0;
+      const manualDiscountAmount = this.row.itemDiscountAmount;
+      const manualDiscountPercent = this.row.itemDiscountPercent;
+
+      if (!this.row.isReturn && quantity <= 0) {
+        showToast({
+          type: 'error',
+          message: 'Quantity must be greater than zero.',
+          duration: 'short',
+        });
+        quantity = this.row.quantity ?? 1;
+      }
+
+      this.row.set('quantity', quantity);
+
+      const existingItems =
+        (this.row.parentdoc as SalesInvoice)?.items?.filter(
+          (invoiceItem: InvoiceItem) =>
+            invoiceItem.item === this.row.item && !invoiceItem.isFreeItem
+        ) ?? [];
+
+      quantity = this.row.quantity ?? 1;
+
+      try {
+        await validateQty(
+          this.row.parentdoc as SalesInvoice,
+          this.row,
+          existingItems
+        );
+      } catch (error) {
+        this.row.set('quantity', quantity);
+        return showToast({
+          type: 'error',
+          message: this.t`${error as string}`,
+          duration: 'short',
+        });
+      }
+
+      if (!this.row.isFreeItem) {
+        this.$emit('applyPricingRule');
+        this.$emit('runSinvFormulas');
+        if (!hasManualDiscount && !isPercentageDiscount) {
+          this.row.set('setItemDiscountAmount', false);
+          this.row.set('itemDiscountPercent', 0);
+        } else if (hasManualDiscount) {
+          this.row.set('setItemDiscountAmount', true);
+          this.row.set('itemDiscountAmount', manualDiscountAmount);
+        } else if (isPercentageDiscount) {
+          this.row.set('setItemDiscountAmount', false);
+          this.row.set('itemDiscountPercent', manualDiscountPercent);
+        }
       }
     },
   },

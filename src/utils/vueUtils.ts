@@ -113,8 +113,10 @@ export function useDocShortcuts(
   shortcuts: Shortcuts,
   docRef: DocRef,
   name: string,
-  isMultiple = true
+  isMultiple = true,
+  options?: { enableSaveShortcut?: boolean }
 ) {
+  const enableSaveShortcut = options?.enableSaveShortcut !== false;
   let context = name;
   if (isMultiple) {
     context = name + '-' + Math.random().toString(36).slice(2, 6);
@@ -159,7 +161,9 @@ export function useDocShortcuts(
       return;
     }
 
-    shortcuts.pmod.set(context, ['KeyS'], syncOrSubmitCallback, false);
+    if (enableSaveShortcut) {
+      shortcuts.pmod.set(context, ['KeyS'], syncOrSubmitCallback, false);
+    }
     shortcuts.pmod.set(context, ['Backspace'], cancelOrDeleteCallback, false);
   });
 
@@ -168,7 +172,9 @@ export function useDocShortcuts(
       return;
     }
 
-    shortcuts.pmod.set(context, ['KeyS'], syncOrSubmitCallback, false);
+    if (enableSaveShortcut) {
+      shortcuts.pmod.set(context, ['KeyS'], syncOrSubmitCallback, false);
+    }
     shortcuts.pmod.set(context, ['Backspace'], cancelOrDeleteCallback, false);
   });
 

@@ -36,6 +36,8 @@ import {
   ToastOptions,
   UIGroupedFields,
 } from './types';
+import { hasPermission } from './authService';
+import { PERMISSIONS, getWritePermissionForSchema, type PermissionCode } from './permissions';
 
 export const toastDurationMap = { short: 2_500, long: 5_000 } as const;
 
@@ -544,6 +546,9 @@ export async function commongDocDelete(
   doc: Doc,
   routeBack = true
 ): Promise<boolean> {
+  if (!ensureDocWritePermission(doc)) {
+    return false;
+  }
   const res = await deleteDocWithPrompt(doc);
   if (!res) {
     return false;
@@ -557,6 +562,9 @@ export async function commongDocDelete(
 }
 
 export async function commonDocCancel(doc: Doc): Promise<boolean> {
+  if (!ensureDocWritePermission(doc)) {
+    return false;
+  }
   const res = await cancelDocWithPrompt(doc);
   if (!res) {
     return false;
@@ -586,6 +594,9 @@ export async function commonDocSync(
 }
 
 async function syncWithoutDialog(doc: Doc): Promise<boolean> {
+  if (!ensureDocWritePermission(doc)) {
+    return false;
+  }
   try {
     await doc.sync();
   } catch (error) {
@@ -606,6 +617,10 @@ export async function commonDocSubmit(doc: Doc): Promise<boolean> {
   }
 
   if (!success) {
+    return false;
+  }
+
+  if (!ensureDocWritePermission(doc)) {
     return false;
   }
 
@@ -848,6 +863,80 @@ function getDocReferenceLabel(doc: Doc) {
   return doc.name || label;
 }
 
+function getRequiredPermissionForDoc(doc: Doc): PermissionCode | null {
+  const schema = doc.schemaName;
+
+  // دفعات: التحديد حسب مراجع الفاتورة (للبيع أو الشراء)
+  if (schema === ModelNameEnum.Payment) {
+    const forTable = doc.for as { referenceType?: string }[] | undefined;
+    if (Array.isArray(forTable) && forTable.length > 0) {
+      const hasSales = forTable.some(
+        (r) =>
+          r.referenceType === ModelNameEnum.SalesInvoice ||
+          r.referenceType === ModelNameEnum.SalesQuote
+      );
+      const hasPurchase = forTable.some(
+        (r) => r.referenceType === ModelNameEnum.PurchaseInvoice
+      );
+      if (hasSales && !hasPurchase) return PERMISSIONS.SALES_WRITE;
+      if (hasPurchase && !hasSales) return PERMISSIONS.PURCHASE_WRITE;
+      // دفعة مختلطة: يشترط صلاحيتا البيع والشراء
+      if (hasSales && hasPurchase) {
+        return PERMISSIONS.SALES_WRITE; // سيُفحص PURCHASE_WRITE في ensureDocWritePermission
+      }
+    }
+    return PERMISSIONS.SALES_WRITE; // دفعة جديدة دون مراجع
+  }
+
+  const fromMap = getWritePermissionForSchema(schema);
+  if (fromMap) return fromMap;
+
+  if (
+    schema === ModelNameEnum.AccountingSettings ||
+    schema === ModelNameEnum.InventorySettings ||
+    schema === ModelNameEnum.Defaults ||
+    schema === ModelNameEnum.POSSettings ||
+    schema === ModelNameEnum.SystemSettings
+  ) {
+    return PERMISSIONS.SETTINGS_EDIT;
+  }
+
+  return null;
+}
+
+function ensureDocWritePermission(doc: Doc): boolean {
+  const perm = getRequiredPermissionForDoc(doc);
+  if (!perm) {
+    return true;
+  }
+
+  if (!hasPermission(perm)) {
+    showCannotSaveOrSubmitToast(doc);
+    return false;
+  }
+
+  // دفعة مختلطة (بيع + شراء): تشترط صلاحيتي الكتابة
+  if (doc.schemaName === ModelNameEnum.Payment) {
+    const forTable = doc.for as { referenceType?: string }[] | undefined;
+    if (Array.isArray(forTable) && forTable.length > 0) {
+      const hasSales = forTable.some(
+        (r) =>
+          r.referenceType === ModelNameEnum.SalesInvoice ||
+          r.referenceType === ModelNameEnum.SalesQuote
+      );
+      const hasPurchase = forTable.some(
+        (r) => r.referenceType === ModelNameEnum.PurchaseInvoice
+      );
+      if (hasSales && hasPurchase && !hasPermission(PERMISSIONS.PURCHASE_WRITE)) {
+        showCannotSaveOrSubmitToast(doc);
+        return false;
+      }
+    }
+  }
+
+  return true;
+}
+
 export const printSizes = [
   'A0',
   'A1',
@@ -1041,7 +1130,7 @@ export async function deleteDb(filePath: string) {
   } else if (error?.code === 'EPERM') {
     await showDialog({
       title: t`Cannot Delete`,
-      detail: t`Close Frappe Books and try manually.`,
+      detail: t`Close Baron Accounting and try manually.`,
       type: 'error',
     });
   } else if (error) {

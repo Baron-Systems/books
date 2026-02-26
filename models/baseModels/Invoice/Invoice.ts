@@ -253,11 +253,20 @@ export abstract class Invoice extends Transactional {
 
     await party.updateOutstandingAmount();
 
-    if (this.makeAutoPayment && this.autoPaymentAccount) {
+    const invoiceOutstanding =
+      lpAddedBaseGrandTotal ?? this.baseGrandTotal ?? this.fyo.pesa(0);
+    const registerOnlyNoPayment = (this as unknown as { __registerOnlyNoAutoPayment?: boolean }).__registerOnlyNoAutoPayment;
+    if (
+      !registerOnlyNoPayment &&
+      this.makeAutoPayment &&
+      this.autoPaymentAccount
+    ) {
       const payment = this.getPayment();
       await payment?.sync();
       await payment?.submit();
       await this.load();
+    } else {
+      await this._applyAutomaticBalanceAdjustment(party, invoiceOutstanding);
     }
 
     if (this.makeAutoStockTransfer && this.autoStockTransferLocation) {
@@ -308,6 +317,81 @@ export abstract class Invoice extends Transactional {
     )) as Party;
 
     await partyDoc.updateOutstandingAmount();
+  }
+
+  /**
+   * Automatic Balance Adjustment: when "Pay on Submit" is disabled, allocate any existing
+   * Customer Credit (Sales) or Vendor Advance (Purchase) to this invoice.
+   * Creates PaymentFor rows linking existing Payment(s) to this invoice and updates
+   * invoice outstanding; does not modify ledger (allocation only).
+   */
+  async _applyAutomaticBalanceAdjustment(
+    party: Party,
+    invoiceOutstanding: Money
+  ): Promise<void> {
+    if (!invoiceOutstanding || invoiceOutstanding.lte(0)) {
+      return;
+    }
+
+    const paymentType = this.isSales ? 'Receive' : 'Pay';
+    const paymentsWithUnallocated =
+      await party.getPaymentsWithUnallocatedAmount(paymentType);
+    const totalUnallocated = paymentsWithUnallocated.reduce(
+      (sum, p) => sum.add(p.unallocated),
+      this.fyo.pesa(0)
+    );
+    if (totalUnallocated.isZero()) {
+      return;
+    }
+
+    const applyAmount = invoiceOutstanding.lte(totalUnallocated)
+      ? invoiceOutstanding
+      : totalUnallocated;
+    let remainingToAllocate = applyAmount;
+
+    const referenceType = this.schemaName as
+      | ModelNameEnum.SalesInvoice
+      | ModelNameEnum.PurchaseInvoice;
+
+    for (const payment of paymentsWithUnallocated) {
+      if (remainingToAllocate.isZero()) break;
+
+      const allocate = remainingToAllocate.lte(payment.unallocated)
+        ? remainingToAllocate
+        : payment.unallocated;
+      if (allocate.isZero()) continue;
+
+      const existingFor = (await this.fyo.db.getAll('PaymentFor', {
+        fields: ['name'],
+        filters: { parent: payment.name },
+      })) as { name: string }[];
+      const idx = existingFor.length;
+
+      await this.fyo.db.insert(ModelNameEnum.PaymentFor, {
+        parent: payment.name,
+        parentSchemaName: 'Payment',
+        parentFieldname: 'for',
+        referenceType,
+        referenceName: this.name,
+        amount: allocate,
+        idx,
+      });
+
+      remainingToAllocate = remainingToAllocate.sub(allocate);
+    }
+
+    const totalApplied = applyAmount.sub(remainingToAllocate);
+    if (totalApplied.isZero()) {
+      return;
+    }
+
+    const newOutstanding = invoiceOutstanding.sub(totalApplied);
+    await this.fyo.db.update(this.schemaName, {
+      name: this.name as string,
+      outstandingAmount: newOutstanding,
+    });
+    await party.updateOutstandingAmount();
+    await this.load();
   }
 
   async afterDelete() {
@@ -1228,6 +1312,25 @@ export abstract class Invoice extends Transactional {
       return defaults?.purchaseInvoiceTerms ?? '';
     },
     date: () => new Date(),
+    priceList: (doc) => {
+      const defaults = doc.fyo.singles.Defaults;
+      if (!defaults) {
+        return '';
+      }
+
+      // Apply price list defaults per document type.
+      if (doc.schemaName === ModelNameEnum.SalesInvoice) {
+        // POS uses SalesInvoice with isPOS flag set.
+        const isPOS = !!(doc as unknown as { isPOS?: boolean }).isPOS;
+        return (isPOS ? defaults.posPriceList : defaults.salesPriceList) ?? '';
+      }
+
+      if (doc.schemaName === ModelNameEnum.PurchaseInvoice) {
+        return defaults.purchasePriceList ?? '';
+      }
+
+      return '';
+    },
   };
 
   static filters: FiltersMap = {
@@ -1327,8 +1430,19 @@ export abstract class Invoice extends Transactional {
     };
 
     if (this.makeAutoPayment && this.autoPaymentAccount) {
-      const autoPaymentAccount = this.isSales ? 'paymentAccount' : 'account';
-      data[autoPaymentAccount] = this.autoPaymentAccount;
+      if (this.isSales) {
+        data.paymentAccount = this.autoPaymentAccount;
+        // For Sales Return (Pay): account must be Debtors, paymentAccount = Cash
+        if (this.isReturn) {
+          data.account = this.account;
+        }
+      } else {
+        data.account = this.autoPaymentAccount;
+        // For Purchase Return (Receive): paymentAccount must be Creditors, account = Cash
+        if (this.isReturn) {
+          data.paymentAccount = this.account;
+        }
+      }
     }
 
     return this.fyo.doc.getNewDoc(ModelNameEnum.Payment, data) as Payment;
@@ -1351,7 +1465,15 @@ export abstract class Invoice extends Transactional {
 
     const itemVisibility = await getItemVisibility(this.fyo);
 
-    if (!this.stockNotTransferred && itemVisibility === 'Inventory Items') {
+    // When isAuto we're called from afterSubmit; stockNotTransferred formula
+    // does not run when doc is submitted so it can be 0/undefined. Skip this
+    // early return and let the loop build the transfer (we return null later
+    // if no items are added).
+    if (
+      !isAuto &&
+      !this.stockNotTransferred &&
+      itemVisibility === 'Inventory Items'
+    ) {
       return null;
     }
 
@@ -1413,9 +1535,14 @@ export abstract class Invoice extends Transactional {
         continue;
       }
 
-      let quantity;
+      let quantity: number | undefined;
       if (itemDoc.trackItem) {
         quantity = row.stockNotTransferred;
+        // When isAuto we're called right after submit; item's stockNotTransferred
+        // formula does not run when parent is submitted, so use quantity as fallback.
+        if (isAuto && (quantity === undefined || quantity === null)) {
+          quantity = row.quantity;
+        }
       } else {
         quantity = row.quantity;
       }
@@ -1434,7 +1561,9 @@ export abstract class Invoice extends Transactional {
         continue;
       }
 
-      if (isAuto) {
+      // Only check existing stock for Shipment (sales): we move stock out.
+      // For Purchase Receipt we receive stock in, so do not skip when stock < quantity.
+      if (isAuto && this.isSales) {
         const stock =
           (await this.fyo.db.getStockQuantity(
             item,

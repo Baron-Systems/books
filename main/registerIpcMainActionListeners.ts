@@ -9,6 +9,7 @@ import {
 import { autoUpdater } from 'electron-updater';
 import { constants } from 'fs';
 import fs from 'fs-extra';
+import type { RequestInit } from 'node-fetch';
 import path from 'path';
 import { SelectFileOptions, SelectFileReturn } from 'utils/types';
 import databaseManager from '../backend/database/manager';
@@ -24,13 +25,22 @@ import {
   getConfigFilesWithModified,
   getErrorHandledReponse,
   isNetworkError,
+  isUpdateCheckIgnorableError,
   setAndGetCleanedConfigFiles,
 } from './helpers';
 import { saveHtmlAsPdf } from './saveHtmlAsPdf';
 import { sendAPIRequest } from './api';
 import { initScheduler } from './initSheduler';
 
+const DB_FOLDER_NAME = 'BA';
+
 export default function registerIpcMainActionListeners(main: Main) {
+  // eslint-disable-next-line @typescript-eslint/no-var-requires
+  const bcrypt = require('bcryptjs') as {
+    hash(password: string, saltRounds: number): Promise<string>;
+    compare(password: string, hash: string): Promise<boolean>;
+  };
+
   ipcMain.handle(IPC_ACTIONS.CHECK_DB_ACCESS, async (_, filePath: string) => {
     try {
       await fs.access(filePath, constants.W_OK | constants.R_OK);
@@ -55,14 +65,15 @@ export default function registerIpcMainActionListeners(main: Main) {
         root = 'dbs';
       }
 
-      const dbsPath = path.join(root, 'Frappe Books');
+      const dbsPath = path.join(root, DB_FOLDER_NAME);
+
       const backupPath = path.join(dbsPath, 'backups');
       await fs.ensureDir(backupPath);
 
       let dbFilePath = path.join(dbsPath, `${companyName}.books.db`);
 
       if (await fs.pathExists(dbFilePath)) {
-        const option = await dialog.showMessageBox({
+        const option = await dialog.showMessageBox(main.mainWindow!, {
           type: 'question',
           title: 'File Exists',
           message: `Filename already exists. Do you want to overwrite the existing file or create a new one?`,
@@ -77,7 +88,7 @@ export default function registerIpcMainActionListeners(main: Main) {
             `${companyName}_${timestamp}.books.db`
           );
 
-          await dialog.showMessageBox({
+          await dialog.showMessageBox(main.mainWindow!, {
             type: 'info',
             message: `New file: ${path.basename(dbFilePath)}`,
           });
@@ -159,7 +170,7 @@ export default function registerIpcMainActionListeners(main: Main) {
     try {
       await autoUpdater.checkForUpdates();
     } catch (error) {
-      if (isNetworkError(error as Error)) {
+      if (isNetworkError(error as Error) || isUpdateCheckIgnorableError(error as Error)) {
         return;
       }
 
@@ -240,6 +251,37 @@ export default function registerIpcMainActionListeners(main: Main) {
     };
   });
 
+  /**
+   * Auth (bcrypt runs in main to avoid crypto in renderer)
+   */
+  ipcMain.handle(
+    IPC_ACTIONS.AUTH_HASH_PASSWORD,
+    async (_, password: string): Promise<{ ok: true; hash: string } | { ok: false; error: string }> => {
+      try {
+        const hash = await bcrypt.hash(password, 12);
+        return { ok: true, hash };
+      } catch (err) {
+        return { ok: false, error: err instanceof Error ? err.message : String(err) };
+      }
+    }
+  );
+
+  ipcMain.handle(
+    IPC_ACTIONS.AUTH_VERIFY_PASSWORD,
+    async (
+      _,
+      password: string,
+      hash: string
+    ): Promise<{ ok: true; result: boolean } | { ok: false; result: false }> => {
+      try {
+        const result = await bcrypt.compare(password, hash);
+        return { ok: true, result };
+      } catch {
+        return { ok: false, result: false };
+      }
+    }
+  );
+
   ipcMain.handle(
     IPC_ACTIONS.GET_TEMPLATES,
     async (_, posPrintWidth?: number) => {
@@ -253,7 +295,7 @@ export default function registerIpcMainActionListeners(main: Main) {
 
   ipcMain.handle(
     IPC_ACTIONS.SEND_API_REQUEST,
-    async (e, endpoint: string, options: RequestInit | undefined) => {
+    async (_, endpoint: string, options: RequestInit | undefined) => {
       return sendAPIRequest(endpoint, options);
     }
   );

@@ -21,19 +21,15 @@
       "fieldname": "role",
       "label": "Role",
       "fieldtype": "Select",
-      "default": "Both",
+      "default": "Customer",
       "options": [
         {
-          "value": "Both",
-          "label": "Both"
+          "value": "Customer",
+          "label": "Customer"
         },
         {
           "value": "Supplier",
           "label": "Supplier"
-        },
-        {
-          "value": "Customer",
-          "label": "Customer"
         }
       ],
       "required": true,

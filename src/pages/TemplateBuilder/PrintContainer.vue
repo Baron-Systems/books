@@ -67,6 +67,7 @@ import {
 import { Verb } from 'fyo/telemetry/types';
 import ErrorBoundary from 'src/components/ErrorBoundary.vue';
 import { getPathAndMakePDF } from 'src/utils/printTemplates';
+import { showToast } from 'src/utils/interactive';
 import { PrintValues } from 'src/utils/types';
 import { defineComponent, PropType } from 'vue';
 import ScaledContainer from './ScaledContainer.vue';
@@ -185,8 +186,15 @@ export default defineComponent({
        */
 
       // @ts-ignore
-      const innerHTML = this.$refs.scaledContainer.$el.children[0].innerHTML;
+      const innerHTML = this.$refs.scaledContainer?.$el?.children?.[0]?.innerHTML;
       if (typeof innerHTML !== 'string') {
+        showToast({ message: this.t`Print preview is not ready.`, type: 'error' });
+        return;
+      }
+
+      const hasContent = innerHTML.replace(/<[^>]+>/g, '').trim().length > 0;
+      if (!hasContent) {
+        showToast({ message: this.t`No content to print. Check template and data.`, type: 'error' });
         return;
       }
 

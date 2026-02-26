@@ -37,7 +37,8 @@
     <div class="row-start-6 grid grid-cols-2 gap-4 mt-auto mb-2 px-10">
       <div class="col-span-2">
         <Button
-          class="w-full bg-green-500 dark:bg-green-700"
+          type="primary"
+          class="w-full"
           style="padding: 1.35rem"
           :disabled="validationError"
           @click="setLoyaltyPoints()"
@@ -54,12 +55,13 @@
     <div class="row-start-6 grid grid-cols-2 gap-4 mt-auto px-10">
       <div class="col-span-2">
         <Button
-          class="w-full bg-red-500 dark:bg-red-700"
+          type="secondary"
+          class="w-full"
           style="padding: 1.35rem"
           @click="cancelLoyaltyProgram"
         >
           <slot>
-            <p class="uppercase text-lg text-white font-semibold">
+            <p class="uppercase text-lg font-semibold">
               {{ t`Cancel` }}
             </p>
           </slot>

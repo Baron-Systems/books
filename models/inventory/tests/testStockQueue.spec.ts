@@ -114,3 +114,50 @@ test('stockQueue:invalidOperations', (t) => {
 
   t.end();
 });
+
+test('stockQueue:outwardFailureLeavesStateUnchanged', (t) => {
+  const q = new StockQueue();
+  q.inward(100, 3);
+  q.inward(200, 2);
+
+  const quantityBefore = q.quantity;
+  const valueBefore = q.value;
+  const queueLengthBefore = q.queue.length;
+  const queueSnapshot = q.queue.map((e) => ({ rate: e.rate, quantity: e.quantity }));
+
+  const result = q.outward(10);
+  t.equal(result, null, 'outward(10) returns null when not enough stock');
+
+  t.equal(q.quantity, quantityBefore, 'quantity unchanged on failure');
+  t.equal(q.value, valueBefore, 'value unchanged on failure');
+  t.equal(q.queue.length, queueLengthBefore, 'queue length unchanged on failure');
+  for (let i = 0; i < q.queue.length; i++) {
+    t.equal(q.queue[i].rate, queueSnapshot[i].rate, `queue[${i}].rate unchanged`);
+    t.equal(q.queue[i].quantity, queueSnapshot[i].quantity, `queue[${i}].quantity unchanged`);
+  }
+
+  const empty = new StockQueue();
+  t.equal(empty.outward(1), null, 'empty queue outward returns null');
+  t.equal(empty.quantity, 0, 'empty queue quantity still 0');
+  t.equal(empty.value, 0, 'empty queue value still 0');
+  t.equal(empty.queue.length, 0, 'empty queue still empty');
+
+  const mismatch = new StockQueue();
+  mismatch.inward(100, 2);
+  (mismatch as { quantity: number }).quantity = 10;
+  (mismatch as { value: number }).value = 1000;
+  const mismatchQueueSnapshot = mismatch.queue.map((e) => ({
+    rate: e.rate,
+    quantity: e.quantity,
+  }));
+  t.equal(mismatch.outward(5), null, 'outward returns null when queue runs out before covering quantity');
+  t.equal(mismatch.quantity, 10, 'quantity unchanged when phase1 fails');
+  t.equal(mismatch.value, 1000, 'value unchanged when phase1 fails');
+  t.deepEqual(
+    mismatch.queue.map((e) => ({ rate: e.rate, quantity: e.quantity })),
+    mismatchQueueSnapshot,
+    'queue unchanged when phase1 fails'
+  );
+
+  t.end();
+});

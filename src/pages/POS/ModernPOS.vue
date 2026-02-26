@@ -54,6 +54,7 @@
 
     <PaymentModal
       :open-modal="openPaymentModal"
+      :opened-for-pay="openPaymentModalForPay"
       @toggle-modal="emitEvent('toggleModal', 'Payment')"
       @set-paid-amount="(amount) => emitEvent('setPaidAmount', amount)"
       @set-payment-method="
@@ -128,14 +129,16 @@
           <div
             class="
               h-full
-              p-2
+              p-3
+              mb-5
               bg-white
               border
               rounded-md
               dark:bg-gray-850 dark:border-gray-800
             "
           >
-            <div class="grid grid-cols-2 gap-2">
+            <!-- Summary: ترتيب أوضح مع تمييز المجموع الكلي -->
+            <div class="grid grid-cols-2 gap-x-3 gap-y-3">
               <FloatingLabelFloatInput
                 :df="{
                   label: t`Total Quantity`,
@@ -149,7 +152,17 @@
                 :read-only="true"
                 :text-right="true"
               />
-
+              <FloatingLabelCurrencyInput
+                :df="{
+                  label: t`Item Discounts`,
+                  fieldtype: 'Currency',
+                  fieldname: 'itemDiscounts',
+                }"
+                size="large"
+                :value="itemDiscounts"
+                :read-only="true"
+                :text-right="true"
+              />
               <FloatingLabelCurrencyInput
                 :df="{
                   label: t`Add'l Discounts`,
@@ -163,133 +176,109 @@
                 :text-right="true"
                 @change="(amount:Money)=> additionalDiscounts = amount"
               />
-            </div>
-
-            <div class="mt-2 grid grid-cols-2 gap-2">
-              <FloatingLabelCurrencyInput
-                :df="{
-                  label: t`Item Discounts`,
-                  fieldtype: 'Currency',
-                  fieldname: 'itemDiscounts',
-                }"
-                size="large"
-                :value="itemDiscounts"
-                :read-only="true"
-                :text-right="true"
-              />
-
-              <FloatingLabelCurrencyInput
+              <div
                 v-if="sinvDoc?.fieldMap"
-                :df="sinvDoc?.fieldMap.grandTotal"
-                size="large"
-                :value="sinvDoc?.grandTotal"
-                :read-only="true"
-                :text-right="true"
-              />
+                class="rounded-lg border-2 border-blue-200 dark:border-blue-700 bg-blue-50/60 dark:bg-blue-900/25 px-2"
+              >
+                <FloatingLabelCurrencyInput
+                  :df="sinvDoc?.fieldMap.grandTotal"
+                  size="large"
+                  :value="sinvDoc?.grandTotal"
+                  :read-only="true"
+                  :text-right="true"
+                  class="grand-total-input"
+                />
+              </div>
             </div>
 
-            <div class="flex w-full gap-2">
-              <div class="w-full">
+            <div
+              class="mt-4 pt-4 border-t border-gray-200 dark:border-gray-700"
+              role="group"
+              :aria-label="t`Actions`"
+            >
+              <div class="grid grid-cols-2 gap-2">
                 <Button
-                  class="mt-2 w-full py-5"
-                  :style="{
-                    backgroundColor:
-                      profile?.saveButtonColour ||
-                      fyo.singles.Defaults?.saveButtonColour,
-                  }"
-                  :class="`${isReturnInvoiceEnabledReturn ? 'py-5' : 'py-6'}`"
+                  type="primary"
+                  class="w-full py-4"
                   @click="$emit('saveInvoiceAction')"
                 >
-                  <slot>
-                    <p class="uppercase text-lg text-white font-semibold">
-                      {{ t`Save` }}
-                    </p>
-                  </slot>
+                  <span class="uppercase text-base font-semibold text-white">
+                    {{ t`Save` }}
+                  </span>
                 </Button>
                 <Button
-                  class="w-full mt-2 py-5"
-                  :style="{
-                    backgroundColor:
-                      profile?.heldButtonColour ||
-                      fyo.singles.Defaults?.heldButtonColour,
-                  }"
-                  :class="`${isReturnInvoiceEnabledReturn ? 'py-5' : 'py-6'}`"
-                  @click="emitEvent('toggleModal', 'SavedInvoice', true)"
-                >
-                  <slot>
-                    <p class="uppercase text-lg text-white font-semibold">
-                      {{ t`Held` }}
-                    </p>
-                  </slot>
-                </Button>
-              </div>
-              <div class="w-full">
-                <Button
-                  class="mt-2 w-full py-5"
-                  :style="{
-                    backgroundColor:
-                      profile?.cancelButtonColour ||
-                      fyo.singles.Defaults?.cancelButtonColour,
-                  }"
-                  :class="`${isReturnInvoiceEnabledReturn ? 'py-5' : 'py-6'}`"
+                  type="secondary"
+                  class="w-full py-4"
                   @click="() => $emit('clearValues')"
                 >
-                  <slot>
-                    <p class="uppercase text-lg text-white font-semibold">
-                      {{ t`Cancel` }}
-                    </p>
-                  </slot>
+                  <span class="uppercase text-base font-semibold">
+                    {{ t`Cancel` }}
+                  </span>
                 </Button>
                 <Button
-                  v-if="isReturnInvoiceEnabledReturn"
-                  class="mt-2 w-full py-5"
-                  :style="{
-                    backgroundColor:
-                      profile?.returnButtonColour ||
-                      fyo.singles.Defaults?.returnButtonColour,
-                  }"
-                  @click="emitEvent('toggleModal', 'ReturnSalesInvoice', true)"
+                  type="primary"
+                  class="w-full py-4"
+                  @click="emitEvent('toggleModal', 'SavedInvoice', true)"
                 >
-                  <slot>
-                    <p class="uppercase text-lg text-white font-semibold">
+                  <span class="uppercase text-base font-semibold text-white">
+                    {{ t`Held` }}
+                  </span>
+                </Button>
+                <template v-if="isReturnInvoiceEnabledReturn">
+                  <Button
+                    type="primary"
+                    class="w-full py-4"
+                    @click="emitEvent('toggleModal', 'ReturnSalesInvoice', true)"
+                  >
+                    <span class="uppercase text-base font-semibold text-white">
                       {{ t`Return` }}
-                    </p>
-                  </slot>
-                </Button>
-                <Button
-                  v-else
-                  class="mt-2 w-full py-5"
-                  :style="{
-                    backgroundColor:
-                      profile?.payButtonColour ||
-                      fyo.singles.Defaults?.payButtonColour,
-                  }"
-                  @click="emitEvent('handlePaymentAction')"
-                >
-                  <slot>
-                    <p class="uppercase text-lg text-white font-semibold">
+                    </span>
+                  </Button>
+                  <Button
+                    type="primary"
+                    class="w-full py-5 text-lg"
+                    :disabled="disablePayButton"
+                    @click="emitEvent('registerOnly')"
+                  >
+                    <span class="uppercase font-bold text-white">
+                      {{ t`Register` }}
+                    </span>
+                  </Button>
+                  <Button
+                    type="primary"
+                    class="w-full py-5 text-lg"
+                    :disabled="disablePayButton"
+                    @click="emitEvent('handlePaymentAction')"
+                  >
+                    <span class="uppercase font-bold text-white">
                       {{ t`Pay` }}
-                    </p>
-                  </slot>
-                </Button>
+                    </span>
+                  </Button>
+                </template>
+                <template v-else>
+                  <Button
+                    type="primary"
+                    class="w-full py-5 text-lg"
+                    :disabled="disablePayButton"
+                    @click="emitEvent('registerOnly')"
+                  >
+                    <span class="uppercase font-bold text-white">
+                      {{ t`Register` }}
+                    </span>
+                  </Button>
+                  <Button
+                    type="primary"
+                    class="w-full py-5 text-lg"
+                    :disabled="disablePayButton"
+                    @click="emitEvent('handlePaymentAction')"
+                  >
+                    <span class="uppercase font-bold text-white">
+                      {{ t`Pay` }}
+                    </span>
+                  </Button>
+                </template>
               </div>
             </div>
-            <Button
-              v-if="isReturnInvoiceEnabledReturn"
-              class="mt-2 w-full py-5"
-              :style="{
-                backgroundColor:
-                  profile?.payButtonColour ||
-                  fyo.singles.Defaults?.payButtonColour,
-              }"
-              @click="emitEvent('handlePaymentAction')"
-            >
-              <slot>
-                <p class="uppercase text-lg text-white font-semibold">
-                  {{ t`Pay` }}
-                </p>
-              </slot>
-            </Button>
           </div>
         </div>
       </div>
@@ -310,7 +299,7 @@
             <!-- Item Search -->
             <MultiLabelLink
               class="w-full"
-              secondary-link="barcode"
+              secondary-link="itemCode"
               third-link="itemCode"
               :df="{
                 label: t`Search Item (Name or
@@ -439,6 +428,7 @@ export default defineComponent({
     isPosShiftOpen: Boolean,
     disablePayButton: Boolean,
     openPaymentModal: Boolean,
+    openPaymentModalForPay: Boolean,
     openKeyboardModal: Boolean,
     openPriceListModal: Boolean,
     openItemEnquiryModal: Boolean,
@@ -526,6 +516,7 @@ export default defineComponent({
     'setTransferClearanceDate',
     'saveAndContinue',
     'handlePaymentAction',
+    'registerOnly',
     'selectedRow',
     'batchSelected',
   ],

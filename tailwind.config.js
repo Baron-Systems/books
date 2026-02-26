@@ -8,7 +8,7 @@ module.exports = {
   purge: false,
   theme: {
     fontFamily: {
-      sans: ['Inter', 'sans-serif'],
+      sans: ['var(--font-sans)', 'Inter', 'sans-serif'],
     },
     screens: {
       sm: '640px',

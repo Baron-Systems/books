@@ -3,7 +3,12 @@ import { Converter } from 'fyo/core/converter';
 import { DocValue, DocValueMap, RawValueMap } from 'fyo/core/types';
 import { Verb } from 'fyo/telemetry/types';
 import { DEFAULT_USER } from 'fyo/utils/consts';
-import { ConflictError, MandatoryError, NotFoundError } from 'fyo/utils/errors';
+import {
+  ConflictError,
+  DuplicateEntryError,
+  MandatoryError,
+  NotFoundError,
+} from 'fyo/utils/errors';
 import Observable from 'fyo/utils/observable';
 import {
   DynamicLinkField,
@@ -594,7 +599,18 @@ export class Doc extends Observable<DocValue | Doc[]> {
         continue;
       }
 
-      data[field.fieldname] = value;
+      // When updating an existing doc, do not set required fields to null if they
+      // are missing in memory (avoids NOT NULL constraint failure in the DB).
+      if (
+        !this.notInserted &&
+        field.required &&
+        (value === undefined || value === null)
+      ) {
+        continue;
+      }
+
+      // Use null for undefined so serialization (e.g. IPC) does not drop the key
+      data[field.fieldname] = value === undefined ? null : value;
     }
     return data;
   }
@@ -897,7 +913,29 @@ export class Doc extends Observable<DocValue | Doc[]> {
     try {
       data = await this.fyo.db.insert(this.schemaName, validDict);
     } catch (err) {
-      throw await getDbSyncError(err as Error, this, this.fyo);
+      const syncErr = await getDbSyncError(err as Error, this, this.fyo);
+      if (
+        syncErr instanceof DuplicateEntryError &&
+        (syncErr.more as { fieldname?: string })?.fieldname === 'name'
+      ) {
+        await setName(this, this.fyo);
+        try {
+          const retryDict = this.getValidDict(false, true);
+          data = await this.fyo.db.insert(this.schemaName, retryDict);
+        } catch (retryErr) {
+          throw await getDbSyncError(retryErr as Error, this, this.fyo);
+        }
+      } else {
+        throw syncErr;
+      }
+    }
+    // Always use the saved numberSeries from validDict after insert so the UI
+    // never reverts to default (backend return or IPC may differ from what we sent).
+    if (this.schema.naming === 'numberSeries' && this.schema.fields.some((f) => f.fieldname === 'numberSeries')) {
+      const series = (validDict.numberSeries ?? data.numberSeries) as string | undefined;
+      if (series != null) {
+        data = { ...data, numberSeries: series };
+      }
     }
     await this._syncValues(data);
 
@@ -916,8 +954,6 @@ export class Doc extends Observable<DocValue | Doc[]> {
     } catch (err) {
       throw await getDbSyncError(err as Error, this, this.fyo);
     }
-    await this._syncValues(data);
-
     return this;
   }
 
@@ -932,6 +968,15 @@ export class Doc extends Observable<DocValue | Doc[]> {
     }
     this._notInserted = false;
     await this.trigger('afterSync');
+
+    // Always reload after full sync lifecycle so UI reflects any DB changes made
+    // during afterSync hooks (including updates performed via fyo.db.update on the
+    // same document or linked flows). This prevents stale values that only appear
+    // after manual page refresh.
+    if (this.name !== undefined) {
+      await this.load();
+    }
+
     this.fyo.doc.observer.trigger(`sync:${this.schemaName}`, this.name);
 
     if (this._addDocToSyncQueue && !!this.shouldDocSyncToERPNext) {

@@ -1,0 +1,5 @@
+# Minimal config so electron-updater can start without ENOENT.
+# electron-builder only generates this when a publish target is set (e.g. publish: ['github']).
+# With publish: [] for Windows, we ship this file so "Check for update" and startup don't crash.
+provider: generic
+url: https://github.com/placeholder/releases

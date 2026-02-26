@@ -792,14 +792,15 @@ export default class DatabaseCore extends DatabaseBase {
       fieldValueMap.name = getRandomString();
     }
 
-    // Column fields
+    // Column fields – use ?? null so optional keys (e.g. party) are always persisted
     const fields = this.schemaMap[schemaName]!.fields.filter(
       (f) => f.fieldtype !== FieldTypeEnum.Table && !f.computed
     );
 
     const validMap: FieldValueMap = {};
     for (const { fieldname } of fields) {
-      validMap[fieldname] = fieldValueMap[fieldname];
+      const v = fieldValueMap[fieldname];
+      validMap[fieldname] = v === undefined ? null : v;
     }
 
     return this.knex!(schemaName).insert(validMap);
@@ -920,15 +921,29 @@ export default class DatabaseCore extends DatabaseBase {
   }
 
   async #updateOne(schemaName: string, fieldValueMap: FieldValueMap) {
-    const updateMap = { ...fieldValueMap };
-    delete updateMap.name;
     const schema = this.schemaMap[schemaName] as Schema;
-    for (const { fieldname, fieldtype, computed } of schema.fields) {
-      if (fieldtype !== FieldTypeEnum.Table && !computed) {
+    const updateMap: FieldValueMap = {};
+    const tableFieldNames = new Set(
+      schema.fields
+        .filter((f) => f.fieldtype === FieldTypeEnum.Table)
+        .map((f) => f.fieldname)
+    );
+    // Only update columns that are present in fieldValueMap. This avoids
+    // overwriting existing DB values with null when the caller sends a partial
+    // payload (e.g. quick edit, or getValidDict omitting required-but-empty).
+    for (const fieldname of Object.keys(fieldValueMap)) {
+      if (fieldname === 'name') {
         continue;
       }
-
-      delete updateMap[fieldname];
+      if (tableFieldNames.has(fieldname)) {
+        continue;
+      }
+      const field = schema.fields.find((f) => f.fieldname === fieldname);
+      if (field?.computed) {
+        continue;
+      }
+      const v = fieldValueMap[fieldname];
+      updateMap[fieldname] = v === undefined ? null : v;
     }
 
     if (Object.keys(updateMap).length === 0) {

@@ -14,5 +14,6 @@
       "fieldtype": "Data",
       "hidden": true
     }
-  ]
+  ],
+  "tableFields": ["item", "tax", "quantity", "transferQuantity", "transferUnit", "rate", "amount"]
 }

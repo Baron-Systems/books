@@ -115,7 +115,7 @@ export const docsPathMap: Record<string, string | undefined> = {
   [ModelNameEnum.PurchaseInvoice]: 'books/purchase-invoices',
   [ModelNameEnum.Payment]: 'books/payments',
   [ModelNameEnum.JournalEntry]: 'books/journal-entries',
-
+  JournalEntryTemplate: 'books/journal-templates',
   // Inventory
   [ModelNameEnum.StockMovement]: 'books/stock-movement',
   [ModelNameEnum.Shipment]: 'books/shipment',

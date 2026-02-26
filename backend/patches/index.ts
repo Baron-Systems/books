@@ -8,7 +8,7 @@ import setPaymentReferenceType from './setPaymentReferenceType';
 import fixLedgerDateTime from './v0_21_0/fixLedgerDateTime';
 import fixItemHSNField from './fixItemHSNField';
 import createPaymentMethods from './createPaymentMethods';
-import addPartyToJournalEntryAccount from './addPartyToJournalEntryAccount';
+
 
 export default [
   { name: 'testPatch', version: '0.5.0-beta.0', patch: testPatch },
@@ -49,12 +49,5 @@ export default [
     version: '0.25.1',
     patch: createPaymentMethods,
   },
-  {
-    name: 'addPartyToJournalEntryAccount',
-    // Run this patch for all databases up to the current app version,
-    // so existing installs that were already on versions > 0.26.0
-    // still get the new "party" column on JournalEntryAccount.
-    version: '0.36.0',
-    patch: addPartyToJournalEntryAccount,
-  },
+
 ] as Patch[];

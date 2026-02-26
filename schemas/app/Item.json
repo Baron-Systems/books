@@ -133,10 +133,10 @@
       "section": "Inventory"
     },
     {
-      "fieldname": "barcode",
-      "label": "Barcode",
-      "fieldtype": "Data",
-      "placeholder": "Barcode",
+      "fieldname": "barcodes",
+      "label": "Barcodes",
+      "fieldtype": "Table",
+      "target": "ItemBarcode",
       "section": "Inventory"
     },
     {
@@ -144,7 +144,7 @@
       "label": "Track Inventory",
       "fieldtype": "Check",
       "section": "Inventory",
-      "default": false
+      "default": true
     },
     {
       "fieldname": "hasBatch",
@@ -166,6 +166,14 @@
       "fieldtype": "Table",
       "target": "UOMConversionItem",
       "section": "Inventory"
+    },
+    {
+      "fieldname": "itemPriceListItem",
+      "label": "Item Prices",
+      "fieldtype": "Table",
+      "target": "ItemPriceListItem",
+      "section": "Price Lists",
+      "tab": "Price Lists"
     }
   ],
   "quickEditFields": [
@@ -177,7 +185,6 @@
     "description",
     "incomeAccount",
     "expenseAccount",
-    "barcode",
     "hsnCode",
     "trackItem",
     "uom"

@@ -1,0 +1,15 @@
+{
+  "name": "ItemBarcode",
+  "label": "Item Barcode",
+  "isChild": true,
+  "fields": [
+    {
+      "fieldname": "barcode",
+      "label": "Barcode",
+      "fieldtype": "Data",
+      "placeholder": "Barcode",
+      "required": true
+    }
+  ],
+  "tableFields": ["barcode"]
+}

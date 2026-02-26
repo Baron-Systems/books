@@ -21,11 +21,11 @@
             inner
           "
         >
-          <div class="flex justify-between items-center">
+          <div class="flex justify-between items-center gap-3">
             <h1 class="font-semibold">{{ title }}</h1>
             <FeatherIcon
               :name="config.iconName"
-              class="w-6 h-6"
+              class="w-7 h-7 flex-shrink-0"
               :class="config.iconColor"
             />
           </div>
@@ -39,12 +39,13 @@
               <p class="text-base">{{ d }}</p>
             </div>
           </template>
-          <div class="flex justify-end gap-4 mt-4">
+          <div class="flex justify-end gap-3 mt-4 flex-wrap">
             <Button
               v-for="(b, index) of buttons"
               :ref="b.isPrimary ? 'primary' : 'secondary'"
               :key="b.label"
-              style="min-width: 5rem"
+              class="whitespace-nowrap"
+              style="min-width: 6.5rem"
               :type="b.isPrimary ? 'primary' : 'secondary'"
               @click="() => handleClick(index)"
             >

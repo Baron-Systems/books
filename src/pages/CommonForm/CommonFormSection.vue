@@ -17,6 +17,15 @@
     </div>
     <div v-if="!collapsed" class="grid gap-4 gap-x-8 grid-cols-2">
       <div
+        v-if="showBarcodeAboveItems && isItemsSection"
+        class="col-span-2 mb-2"
+      >
+        <Barcode
+          class="h-9 w-36"
+          @item-selected="(name: string) => $emit('item-selected', name)"
+        />
+      </div>
+      <div
         v-for="field of fields"
         :key="field.fieldname"
         :class="[
@@ -26,6 +35,22 @@
           field.fieldname === 'termsAndConditions' ? 'col-span-2' : '',
         ]"
       >
+        <div
+          v-if="field.fieldtype === 'Table' && field.fieldname === 'for' && doc?.schemaName === 'Payment'"
+          class="mb-2"
+        >
+          <Button
+            type="secondary"
+            :loading="fetchOutstandingLoading"
+            :disabled="!!(doc?.isSubmitted || doc?.isCancelled) || !doc?.party || !doc?.paymentType"
+            @click="onFetchOutstandingInvoices"
+          >
+            {{ t`جلب الفواتير المعلقة` }}
+          </Button>
+          <span v-if="fetchOutstandingError" class="ml-2 text-sm text-red-600">
+            {{ fetchOutstandingError }}
+          </span>
+        </div>
         <Table
           v-if="field.fieldtype === 'Table'"
           ref="fields"
@@ -36,6 +61,14 @@
           @editrow="(doc: Doc) => $emit('editrow', doc)"
           @change="(value: DocValue) => $emit('value-change', field, value)"
           @row-change="(field:Field, value:DocValue, parentfield:Field) => $emit('row-change',field, value, parentfield)"
+        />
+        <BrandColorSwatches
+          v-else-if="field.fieldname === 'brandColor'"
+          :df="field"
+          :value="String(doc[field.fieldname] ?? '')"
+          :show-label="true"
+          :border="true"
+          @change="(value: DocValue) => $emit('value-change', field, value)"
         />
         <FormControl
           v-else
@@ -61,13 +94,16 @@
 import { DocValue } from 'fyo/core/types';
 import { Doc } from 'fyo/model/doc';
 import { Field } from 'schemas/types';
+import Button from 'src/components/Button.vue';
+import Barcode from 'src/components/Controls/Barcode.vue';
+import BrandColorSwatches from 'src/components/Controls/BrandColorSwatches.vue';
 import FormControl from 'src/components/Controls/FormControl.vue';
 import Table from 'src/components/Controls/Table.vue';
 import { focusOrSelectFormControl } from 'src/utils/ui';
 import { defineComponent, PropType } from 'vue';
 
 export default defineComponent({
-  components: { FormControl, Table },
+  components: { Button, Barcode, BrandColorSwatches, FormControl, Table },
   props: {
     title: { type: String, default: '' },
     errors: {
@@ -78,17 +114,96 @@ export default defineComponent({
     doc: { type: Object as PropType<Doc>, required: true },
     collapsible: { type: Boolean, default: true },
     fields: { type: Array as PropType<Field[]>, required: true },
+    showBarcodeAboveItems: { type: Boolean, default: false },
   },
-  emits: ['editrow', 'value-change', 'row-change'],
+  emits: [
+    'editrow',
+    'value-change',
+    'row-change',
+    'outstanding-invoices-fetched',
+    'outstanding-invoices-reset',
+    'item-selected',
+  ],
+  computed: {
+    isItemsSection(): boolean {
+      return (this.fields ?? []).some(
+        (f) => f.fieldname === 'items' && f.fieldtype === 'Table'
+      );
+    },
+  },
   data() {
-    return { collapsed: false } as {
+    return {
+      collapsed: false,
+      fetchOutstandingLoading: false,
+      fetchOutstandingError: '',
+      hasAutoFetchedAttempted: false,
+    } as {
       collapsed: boolean;
+      fetchOutstandingLoading: boolean;
+      fetchOutstandingError: string;
+      hasAutoFetchedAttempted: boolean;
     };
+  },
+  watch: {
+    'doc.party'(value: unknown, oldValue: unknown) {
+      if (value === oldValue) {
+        return;
+      }
+      this.resetPaymentOutstandingState();
+      this.tryAutoFetchOutstandingInvoices();
+    },
+    'doc.paymentType'(value: unknown, oldValue: unknown) {
+      if (value === oldValue) {
+        return;
+      }
+      this.resetPaymentOutstandingState();
+      this.tryAutoFetchOutstandingInvoices();
+    },
   },
   mounted() {
     focusOrSelectFormControl(this.doc, this.$refs.nameField);
+    this.$nextTick(() => this.tryAutoFetchOutstandingInvoices());
   },
   methods: {
+    resetPaymentOutstandingState() {
+      if (this.doc?.schemaName !== 'Payment') {
+        return;
+      }
+
+      this.hasAutoFetchedAttempted = false;
+      this.fetchOutstandingError = '';
+      this.$emit('outstanding-invoices-reset');
+
+      if (this.doc?.isSubmitted || this.doc?.isCancelled) {
+        return;
+      }
+
+      const payment = this.doc as { for?: unknown[] };
+      if (!Array.isArray(payment.for) || payment.for.length === 0) {
+        return;
+      }
+
+      payment.for = [];
+      const forField = this.fields?.find((f) => f.fieldname === 'for');
+      if (forField) {
+        this.$emit('value-change', forField, payment.for);
+      }
+    },
+    tryAutoFetchOutstandingInvoices() {
+      if (
+        this.doc?.schemaName !== 'Payment' ||
+        this.hasAutoFetchedAttempted ||
+        this.fetchOutstandingLoading ||
+        !this.doc?.party ||
+        !this.doc?.paymentType ||
+        this.doc?.isSubmitted ||
+        this.doc?.isCancelled
+      ) {
+        return;
+      }
+      this.hasAutoFetchedAttempted = true;
+      void this.onFetchOutstandingInvoices();
+    },
     tableValue(value: unknown): unknown[] {
       if (Array.isArray(value)) {
         return value;
@@ -102,6 +217,36 @@ export default defineComponent({
       }
 
       this.collapsed = !this.collapsed;
+    },
+    async onFetchOutstandingInvoices() {
+      const payment = this.doc as {
+        fetchOutstandingInvoicesAndDistribute?: () => Promise<void>;
+        for?: unknown[];
+        amount?: unknown;
+      };
+      if (!payment?.fetchOutstandingInvoicesAndDistribute) {
+        return;
+      }
+      this.fetchOutstandingLoading = true;
+      this.fetchOutstandingError = '';
+      try {
+        await payment.fetchOutstandingInvoicesAndDistribute();
+        const forField = this.fields?.find((f) => f.fieldname === 'for');
+        if (forField) {
+          this.$emit('value-change', forField, payment.for);
+        }
+        this.$emit('outstanding-invoices-fetched');
+      } catch (e: unknown) {
+        this.fetchOutstandingError =
+          (e as Error)?.message ?? String(e);
+        // Allow save even when there are no outstanding invoices (user has "fetched")
+        const msg = (e as Error)?.message ?? '';
+        if (msg.includes('No outstanding invoices') || msg.includes('لم يتم العثور على فواتير معلقة')) {
+          this.$emit('outstanding-invoices-fetched');
+        }
+      } finally {
+        this.fetchOutstandingLoading = false;
+      }
     },
   },
 });

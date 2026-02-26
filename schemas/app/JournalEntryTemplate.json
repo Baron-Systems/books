@@ -1,0 +1,37 @@
+{
+  "label": "Journal Entry Template",
+  "name": "JournalEntryTemplate",
+  "naming": "manual",
+  "isSubmittable": false,
+  "fields": [
+    {
+      "fieldname": "name",
+      "label": "Template Name",
+      "fieldtype": "Data",
+      "required": true,
+      "section": "Default"
+    },
+    {
+      "fieldname": "description",
+      "label": "Description",
+      "fieldtype": "Text",
+      "section": "Default"
+    },
+    {
+      "fieldname": "isActive",
+      "label": "Active",
+      "fieldtype": "Check",
+      "default": true,
+      "section": "Default"
+    },
+    {
+      "fieldname": "lines",
+      "label": "Template Lines",
+      "fieldtype": "Table",
+      "target": "JournalEntryTemplateLine",
+      "required": true,
+      "section": "Lines"
+    }
+  ],
+  "keywordFields": ["name"]
+}

@@ -54,7 +54,7 @@
           :key="df.fieldname"
           size="large"
           :df="df"
-          :value="row[df.fieldname]"
+          :value="row[df.fieldname as keyof POSItem]"
           :readOnly="true"
         />
       </Row>
@@ -113,7 +113,7 @@
           :key="df.fieldname"
           size="large"
           :df="df"
-          :value="row[df.fieldname]"
+          :value="row[df.fieldname as keyof POSItem]"
           :readOnly="true"
         />
       </Row>

@@ -27,6 +27,7 @@ import { OptionField } from 'schemas/types';
 import Button from 'src/components/Button.vue';
 import Select from 'src/components/Controls/Select.vue';
 import FormHeader from 'src/components/FormHeader.vue';
+import { fyo } from 'src/initFyo';
 import { defineComponent } from 'vue';
 
 export default defineComponent({
@@ -38,12 +39,18 @@ export default defineComponent({
   },
   computed: {
     df(): OptionField {
-      const options = PrintTemplate.lists.type(this.doc);
+      const options =
+        typeof PrintTemplate.lists?.type === 'function'
+          ? PrintTemplate.lists.type(this.doc)
+          : ['SalesInvoice'];
+      const first = options[0];
+      const firstValue =
+        typeof first === 'string' ? first : first?.value ?? 'SalesInvoice';
       return {
         ...fyo.getField('PrintTemplate', 'type'),
         options,
         fieldtype: 'Select',
-        default: options[0].value,
+        default: firstValue,
       } as OptionField;
     },
   },

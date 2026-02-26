@@ -20,6 +20,12 @@
       "section": "Item"
     },
     {
+      "fieldname": "rateInSelectedUnit",
+      "label": "Rate in Selected Unit",
+      "fieldtype": "Currency",
+      "section": "Item"
+    },
+    {
       "fieldname": "rate",
       "label": "Rate",
       "fieldtype": "Currency",
@@ -27,5 +33,5 @@
       "section": "Item"
     }
   ],
-  "tableFields": ["item", "unit", "rate"]
+  "tableFields": ["item", "unit", "rateInSelectedUnit", "rate"]
 }

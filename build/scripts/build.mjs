@@ -63,10 +63,12 @@ async function buildMainProcessSource() {
 }
 
 async function buildRendererProcessSource() {
-  const base = 'app://';
+  // Use app://./ so document (app://./index.html) and assets (app://./assets/...) share the same origin.
+  // Otherwise fonts from app://assets/ are cross-origin and can be blocked by Chromium.
+  const base = 'app://./';
   const outDir = path.join(buildDirPath, 'src');
   await vite.build({
-    base: `/${base}`,
+    base,
     root: path.join(root, 'src'),
     build: { outDir, sourcemap: true },
     plugins: [vue()],
@@ -86,6 +88,7 @@ async function buildRendererProcessSource() {
       },
     },
   });
+  // Remove leading slash if Vite emitted /app://./... so URLs become app://./...
   removeBaseLeadingSlash(outDir, base);
 }
 
@@ -159,16 +162,19 @@ async function packageApp() {
     ...builderArgs,
   };
 
+  // Default to no publishing for local builds.
+  // CI/release pipelines should pass `--publish always` explicitly.
+  buildOptions.publish ??= 'never';
+
   await builder.build(buildOptions);
 }
 
 /**
- * Removes leading slash from all renderer files
- * electron uses a custom registered protocol to load the
- * files: "app://"
+ * Removes leading slash from all renderer files so that asset URLs
+ * use the same origin as the document (e.g. app://./assets/...).
  *
  * @param {string} dir
- * @param {string} base
+ * @param {string} base e.g. 'app://./'
  */
 function removeBaseLeadingSlash(dir, base) {
   for (const file of fs.readdirSync(dir)) {
@@ -179,6 +185,10 @@ function removeBaseLeadingSlash(dir, base) {
     }
 
     const contents = fs.readFileSync(filePath).toString('utf-8');
-    fs.writeFileSync(filePath, contents.replaceAll('/' + base, base));
+    const withLeadingSlash = '/' + base;
+    const fixed = contents.includes(withLeadingSlash)
+      ? contents.replaceAll(withLeadingSlash, base)
+      : contents;
+    if (fixed !== contents) fs.writeFileSync(filePath, fixed);
   }
 }

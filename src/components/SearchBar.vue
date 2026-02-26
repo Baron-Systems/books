@@ -1,17 +1,49 @@
 <template>
-  <div>
-    <!-- Search Bar Button -->
-    <Button
-      class="px-3 py-2 rounded-r-none dark:bg-gray-900"
-      :padding="false"
-      @click="open"
+  <!-- Search trigger (looks like input) -->
+  <button
+    v-if="canUseSearch"
+    class="
+      window-no-drag
+      flex
+      items-center
+      gap-2
+      px-3
+      h-10
+      rounded-xl
+      border
+      app-border
+      bg-gray-50
+      dark:bg-gray-890
+      hover:bg-gray-100
+      dark:hover:bg-gray-900
+      transition-colors
+      min-w-56
+      w-96
+      text-left
+    "
+    @click="open"
+  >
+    <feather-icon name="search" class="w-4 h-4 text-gray-500 dark:text-gray-400" />
+    <span class="text-sm text-gray-500 dark:text-gray-400 select-none truncate">
+      {{ t`Search...` }}
+    </span>
+    <span
+      class="
+        ms-auto
+        text-xs
+        px-2
+        py-0.5
+        rounded-lg
+        border
+        app-border
+        text-gray-500
+        dark:text-gray-400
+        select-none
+      "
     >
-      <feather-icon
-        name="search"
-        class="w-4 h-4 text-gray-700 dark:text-gray-300"
-      />
-    </Button>
-  </div>
+      Ctrl K
+    </span>
+  </button>
 
   <!-- Search Modal -->
   <Modal
@@ -192,18 +224,6 @@
             <p>↑↓ {{ t`Navigate` }}</p>
             <p>↩ {{ t`Select` }}</p>
             <p><span class="tracking-tighter">esc</span> {{ t`Close` }}</p>
-            <button
-              class="
-                flex
-                items-center
-                hover:text-gray-800
-                dark:hover:text-gray-300
-              "
-              @click="openDocs"
-            >
-              <feather-icon name="help-circle" class="w-4 h-4 me-1" />
-              {{ t`Help` }}
-            </button>
           </div>
 
           <p v-if="searcher?.numSearches" class="ms-auto">
@@ -248,7 +268,6 @@
 import { fyo } from 'src/initFyo';
 import { getBgTextColorClass } from 'src/utils/colors';
 import { searcherKey, shortcutsKey } from 'src/utils/injectionKeys';
-import { docsPathMap } from 'src/utils/misc';
 import {
   SearchGroup,
   SearchItems,
@@ -256,8 +275,9 @@ import {
   getGroupLabelMap,
   searchGroups,
 } from 'src/utils/search';
+import { hasInterface } from 'src/utils/authService';
+import { getInterfaceIdForRoute, INTERFACE_IDS } from 'src/utils/interfaces';
 import { defineComponent, inject, nextTick } from 'vue';
-import Button from './Button.vue';
 import Modal from './Modal.vue';
 
 const COMPONENT_NAME = 'SearchBar';
@@ -265,7 +285,7 @@ const COMPONENT_NAME = 'SearchBar';
 type SchemaFilters = { value: string; label: string; index: number }[];
 
 export default defineComponent({
-  components: { Modal, Button },
+  components: { Modal },
   setup() {
     return {
       searcher: inject(searcherKey),
@@ -284,6 +304,9 @@ export default defineComponent({
     };
   },
   computed: {
+    canUseSearch(): boolean {
+      return hasInterface(INTERFACE_IDS.SEARCH);
+    },
     groupLabelMap(): Record<SearchGroup, string> {
       return getGroupLabelMap();
     },
@@ -332,12 +355,14 @@ export default defineComponent({
         return [];
       }
 
-      const suggestions = this.searcher.search(this.inputValue);
+      const rawSuggestions = this.searcher.search(this.inputValue);
+      const filtered = rawSuggestions.filter((si) => this.isItemAllowed(si));
+
       if (this.limit === -1) {
-        return suggestions;
+        return filtered;
       }
 
-      return suggestions.slice(0, this.limit);
+      return filtered.slice(0, this.limit);
     },
   },
   async mounted() {
@@ -356,9 +381,6 @@ export default defineComponent({
     this.shortcuts?.delete(COMPONENT_NAME);
   },
   methods: {
-    openDocs() {
-      ipc.openLink('https://docs.frappe.io/' + docsPathMap.Search);
-    },
     getShortcuts() {
       const ifOpen = (cb: Function) => () => this.openModal && cb();
       const ifClose = (cb: Function) => () => !this.openModal && cb();
@@ -366,7 +388,11 @@ export default defineComponent({
       const shortcuts = [
         {
           shortcut: 'KeyK',
-          callback: ifClose(() => this.open()),
+          callback: ifClose(() => {
+            if (this.canUseSearch) {
+              this.open();
+            }
+          }),
         },
       ];
 
@@ -397,6 +423,10 @@ export default defineComponent({
       }
     },
     open(): void {
+      if (!this.canUseSearch) {
+        return;
+      }
+
       this.openModal = true;
       this.searcher?.updateKeywords();
 
@@ -452,6 +482,55 @@ export default defineComponent({
       }
 
       return `text-${color}-600 dark:text-${color}-400 border-${color}-100 dark:border-${color}-800`;
+    },
+    isItemAllowed(item: SearchItems[number]): boolean {
+      // عناصر بدون route أو schemaName تترك كما هي
+      const group = (item as SearchItem).group;
+
+      // عناصر تعتمد على route (List/Report/Page/Recent)
+      if ('route' in item && item.route) {
+        try {
+          const url = item.route as string;
+          const path = url.split('?')[0];
+          const params: { schemaName?: string; pageTitle?: string; reportClassName?: string } =
+            {};
+
+          if (path.startsWith('/list/')) {
+            const parts = path.split('/');
+            params.schemaName = decodeURIComponent(parts[2] || '');
+            params.pageTitle = decodeURIComponent(parts[3] || '');
+          } else if (path.startsWith('/report/')) {
+            const parts = path.split('/');
+            params.reportClassName = decodeURIComponent(parts[2] || '');
+          }
+
+          const interfaceId = getInterfaceIdForRoute(path, params);
+          if (interfaceId === null) {
+            return true;
+          }
+
+          return hasInterface(interfaceId);
+        } catch {
+          return true;
+        }
+      }
+
+      // عناصر الإنشاء والوثائق تستخدم schemaName لربطها بالواجهة (نموذج التحرير)
+      if ('schemaName' in item && (item as any).schemaName) {
+        const schemaName = String((item as any).schemaName);
+        try {
+          const path = `/edit/${schemaName}/__dummy__`;
+          const interfaceId = getInterfaceIdForRoute(path, { schemaName });
+          if (interfaceId === null) {
+            return true;
+          }
+          return hasInterface(interfaceId);
+        } catch {
+          return true;
+        }
+      }
+
+      return true;
     },
   },
 });

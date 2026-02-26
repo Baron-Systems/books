@@ -32,7 +32,7 @@
 
   <div
     class="overflow-y-auto overflow-x-auto custom-scroll custom-scroll-thumb1"
-    style="height: 50vh"
+    style="height: 100%"
   >
     <Row
       v-for="row in sinvDoc.items"
@@ -69,6 +69,7 @@ import Row from 'src/components/Row.vue';
 import RowEditForm from 'src/pages/CommonForm/RowEditForm.vue';
 import SelectedItemRow from './SelectedItemRow.vue';
 import { isNumeric } from 'src/utils';
+import { t } from 'fyo';
 import { inject } from 'vue';
 import { defineComponent } from 'vue';
 import { SalesInvoiceItem } from 'models/baseModels/SalesInvoiceItem/SalesInvoiceItem';
@@ -110,39 +111,39 @@ export default defineComponent({
         {
           fieldname: 'item',
           fieldtype: 'Link',
-          label: 'Item',
-          placeholder: 'Item',
+          label: t`Item`,
+          placeholder: t`Item`,
           required: true,
           schemaName: 'Item',
         },
         {
           fieldname: 'quantity',
-          label: 'Quantity',
-          placeholder: 'Quantity',
+          label: t`Quantity`,
+          placeholder: t`Quantity`,
           fieldtype: 'Int',
           required: true,
           schemaName: '',
         },
         {
           fieldname: 'unit',
-          label: 'Unit Type',
-          placeholder: 'Unit',
+          label: t`Unit Type`,
+          placeholder: t`Unit`,
           fieldtype: 'Link',
           required: true,
           schemaName: 'UOM',
         },
         {
           fieldname: 'rate',
-          label: 'Rate',
-          placeholder: 'Rate',
+          label: t`Rate`,
+          placeholder: t`Rate`,
           fieldtype: 'Currency',
           required: true,
           schemaName: '',
         },
         {
           fieldname: 'amount',
-          label: 'Amount',
-          placeholder: 'Amount',
+          label: t`Amount`,
+          placeholder: t`Amount`,
           fieldtype: 'Currency',
           required: true,
           schemaName: '',

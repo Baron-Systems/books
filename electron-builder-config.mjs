@@ -20,9 +20,9 @@ const frappeBooksConfig = {
   artifactName: '${productName}-v${version}-${os}-${arch}.${ext}',
   asarUnpack: '**/*.node',
   extraResources: [
-    { from: 'log_creds.txt', to: '../creds/log_creds.txt' },
     { from: 'translations', to: '../translations' },
     { from: 'templates', to: '../templates' },
+    { from: 'build/app-update.yml', to: 'app-update.yml' },
   ],
   files: '**',
   extends: null,
@@ -46,11 +46,11 @@ const frappeBooksConfig = {
     publish: ['github'],
   },
   win: {
-    publisherName: 'Frappe Technologies Pvt. Ltd.',
+    publisherName: 'Baron Accounting',
     artifactName: '${productName}-v${version}-windows-${arch}.${ext}',
     signDlls: true,
     icon: 'build/icon.ico',
-    publish: ['github'],
+    publish: [],
     target: [
       {
         target: 'nsis',
@@ -74,7 +74,7 @@ const frappeBooksConfig = {
     icon: 'build/icons',
     artifactName: '${productName}-v${version}-linux-${arch}.${ext}',
     category: 'Finance',
-    publish: ['github'],
+    publish: [],
     target: [
       {
         target: 'deb',

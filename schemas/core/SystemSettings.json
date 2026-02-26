@@ -188,6 +188,48 @@
       "section": "Theme Settings"
     },
     {
+      "fieldname": "baseFontSize",
+      "label": "Font Size",
+      "fieldtype": "Int",
+      "default": 14,
+      "minvalue": 12,
+      "maxvalue": 24,
+      "description": "Base font size (in pixels) applied across the entire app.",
+      "section": "Theme Settings"
+    },
+    {
+      "fieldname": "fontWeight",
+      "label": "Font Weight",
+      "fieldtype": "Select",
+      "default": "700",
+      "description": "Base font weight applied across the entire app.",
+      "section": "Theme Settings",
+      "options": [
+        { "value": "400", "label": "Normal" },
+        { "value": "500", "label": "Medium" },
+        { "value": "600", "label": "Semi-Bold" },
+        { "value": "700", "label": "Bold" }
+      ]
+    },
+    {
+      "fieldname": "autoThemeColors",
+      "label": "Auto Theme Colors",
+      "fieldtype": "Check",
+      "default": true,
+      "sub_label": "اختر لون الهوية الأساسي وسيتم توليد باقي درجات الألوان تلقائيًا",
+      "description": "When enabled, derived colors (accent shades) are generated from Brand Color.",
+      "section": "Theme Settings"
+    },
+    {
+      "fieldname": "brandColor",
+      "label": "Brand Color",
+      "fieldtype": "Data",
+      "default": "#1F6AE1",
+      "sub_label": "لون الهوية الأساسي (يؤثر على التحديد، الأزرار، والمربعات)",
+      "description": "Base brand color (hex).",
+      "section": "Theme Settings"
+    },
+    {
       "fieldname": "primaryColor",
       "label": "Primary",
       "fieldtype": "Data",
@@ -299,9 +341,10 @@
       "fieldname": "fontFamily",
       "label": "Font Family",
       "fieldtype": "Select",
-      "default": "Inter",
+      "default": "Cairo",
       "section": "Theme Settings",
       "options": [
+        { "value": "Cairo", "label": "Cairo" },
         { "value": "Inter", "label": "Inter" },
         { "value": "Arial", "label": "Arial" },
         { "value": "Times New Roman", "label": "Times New Roman" }
@@ -311,9 +354,27 @@
       "fieldname": "baseFontSize",
       "label": "Base Font Size",
       "fieldtype": "Int",
-      "default": 16,
+      "default": 14,
       "minvalue": 11,
       "maxvalue": 18,
+      "section": "Theme Settings"
+    },
+    {
+      "fieldname": "sidebarFontSize",
+      "label": "Sidebar Font Size",
+      "fieldtype": "Int",
+      "default": 16,
+      "minvalue": 10,
+      "maxvalue": 22,
+      "section": "Theme Settings"
+    },
+    {
+      "fieldname": "buttonFontSize",
+      "label": "Button Font Size",
+      "fieldtype": "Int",
+      "default": 16,
+      "minvalue": 10,
+      "maxvalue": 22,
       "section": "Theme Settings"
     },
     {
@@ -329,7 +390,7 @@
       "fieldname": "radiusLevel",
       "label": "Border Radius",
       "fieldtype": "Select",
-      "default": "Medium",
+      "default": "Large",
       "section": "Theme Settings",
       "options": [
         { "value": "Small", "label": "Small" },

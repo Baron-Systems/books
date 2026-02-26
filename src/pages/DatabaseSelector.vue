@@ -22,7 +22,7 @@
       <!-- Welcome to Frappe Books -->
       <div class="px-4 py-4">
         <h1 class="text-2xl font-semibold select-none dark:text-gray-25">
-          {{ t`Welcome to Frappe Books` }}
+          {{ t`البارون للمحاسبة` }}
         </h1>
         <p class="text-gray-600 dark:text-gray-400 text-base select-none">
           {{

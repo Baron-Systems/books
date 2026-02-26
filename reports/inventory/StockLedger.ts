@@ -8,10 +8,19 @@ import { ValuationMethod } from 'models/inventory/types';
 import { ModelNameEnum } from 'models/types';
 import getCommonExportActions from 'reports/commonExporter';
 import { Report } from 'reports/Report';
-import { ColumnField, ReportCell, ReportData, ReportRow } from 'reports/types';
+import {
+  ColumnField,
+  ReportCell,
+  ReportData,
+  ReportRow,
+} from 'reports/types';
 import { Field, RawValue } from 'schemas/types';
 import { isNumeric } from 'src/utils';
-import { getRawStockLedgerEntries, getStockLedgerEntries } from './helpers';
+import {
+  getItemUnits,
+  getRawStockLedgerEntries,
+  getStockLedgerEntries,
+} from './helpers';
 import { ComputedStockLedgerEntry, ReferenceType } from './types';
 
 export class StockLedger extends Report {
@@ -75,11 +84,14 @@ export class StockLedger extends Report {
 
     const rawData = cloneDeep(this._rawData);
     if (!rawData) {
+      this.totalsRow = null;
       return [];
     }
 
     const filtered = this._getFilteredRawData(rawData);
     const grouped = this._getGroupedRawData(filtered);
+
+    this.totalsRow = this._buildTotalsRow(filtered);
 
     return grouped.map((row) =>
       this._convertRawDataRowToReportRow(row as RawValueMap, {
@@ -89,11 +101,74 @@ export class StockLedger extends Report {
     );
   }
 
+  _buildTotalsRow(filtered: ComputedStockLedgerEntry[]): ReportRow | null {
+    if (!filtered.length) {
+      return null;
+    }
+
+    const columns = this.getColumns();
+    const sumQuantity = filtered.reduce((s, r) => s + (r.quantity ?? 0), 0);
+    const sumBalanceQuantity = filtered.reduce(
+      (s, r) => s + (r.balanceQuantity ?? 0),
+      0
+    );
+    const sumBalanceValue = filtered.reduce(
+      (s, r) => s + (r.balanceValue ?? 0),
+      0
+    );
+    const sumValueChange = filtered.reduce(
+      (s, r) => s + (r.valueChange ?? 0),
+      0
+    );
+
+    const numericSums: Record<string, number> = {
+      quantity: sumQuantity,
+      balanceQuantity: sumBalanceQuantity,
+      balanceValue: sumBalanceValue,
+      valueChange: sumValueChange,
+    };
+
+    const cells: ReportCell[] = columns.map((col, i) => {
+      const fieldname = col.fieldname as keyof ComputedStockLedgerEntry;
+      const fieldtype = col.fieldtype;
+      const sum = numericSums[fieldname];
+      const isSumCol = sum !== undefined;
+
+      let value = '';
+      let rawValue: RawValue = '';
+      const align = isNumeric(fieldtype) ? 'right' : 'left';
+
+      if (i === 0) {
+        value = t`Total`;
+        rawValue = '';
+      } else if (isSumCol) {
+        rawValue = sum;
+        value = this.fyo.format(sum, fieldtype);
+      }
+
+      return {
+        value,
+        rawValue,
+        align: isSumCol ? 'right' : 'left',
+        width: col.width ?? 1,
+        bold: i === 0,
+      };
+    });
+
+    return { cells };
+  }
+
   async _setRawData() {
     const valuationMethod = ValuationMethod.FIFO;
 
     const rawSLEs = await getRawStockLedgerEntries(this.fyo);
     this._rawData = getStockLedgerEntries(rawSLEs, valuationMethod);
+
+    const itemNames = [...new Set((this._rawData ?? []).map((e) => e.item))];
+    const itemUnits = await getItemUnits(this.fyo, itemNames);
+    for (const entry of this._rawData ?? []) {
+      entry.unit = itemUnits[entry.item] ?? '';
+    }
   }
 
   _getFilteredRawData(rawData: ComputedStockLedgerEntry[]) {
@@ -257,7 +332,7 @@ export class StockLedger extends Report {
     if (this.hasBatches) {
       batch.push({
         fieldname: 'batch',
-        label: 'Batch',
+        label: t`Batch`,
         fieldtype: 'Link',
         target: 'Batch',
       });
@@ -266,7 +341,7 @@ export class StockLedger extends Report {
     if (this.hasSerialNumbers) {
       serialNumber.push({
         fieldname: 'serialNumber',
-        label: 'Serial Number',
+        label: t`Serial Number`,
         fieldtype: 'Data',
       });
     }
@@ -280,60 +355,66 @@ export class StockLedger extends Report {
       },
       {
         fieldname: 'date',
-        label: 'Date',
+        label: t`Date`,
         fieldtype: 'Datetime',
         width: 1.25,
       },
       {
         fieldname: 'item',
-        label: 'Item',
+        label: t`Item`,
         fieldtype: 'Link',
       },
       {
         fieldname: 'location',
-        label: 'Location',
+        label: t`Location`,
         fieldtype: 'Link',
       },
       ...batch,
       ...serialNumber,
       {
         fieldname: 'quantity',
-        label: 'Quantity',
+        label: t`Quantity`,
         fieldtype: 'Float',
       },
       {
+        fieldname: 'unit',
+        label: t`Unit Type`,
+        fieldtype: 'Link',
+        target: 'UOM',
+      },
+      {
         fieldname: 'balanceQuantity',
-        label: 'Balance Qty.',
+        label: t`Balance Qty.`,
         fieldtype: 'Float',
       },
       {
         fieldname: 'incomingRate',
-        label: 'Incoming rate',
+        label: t`Incoming Rate`,
         fieldtype: 'Currency',
       },
       {
         fieldname: 'valuationRate',
-        label: 'Valuation Rate',
+        label: t`Valuation Rate`,
         fieldtype: 'Currency',
       },
       {
         fieldname: 'balanceValue',
-        label: 'Balance Value',
+        label: t`Balance Value`,
         fieldtype: 'Currency',
       },
       {
         fieldname: 'valueChange',
-        label: 'Value Change',
+        label: t`Value Change`,
         fieldtype: 'Currency',
       },
       {
         fieldname: 'referenceName',
-        label: 'Ref. Name',
+        label: t`Ref. Name`,
         fieldtype: 'DynamicLink',
       },
       {
         fieldname: 'referenceType',
-        label: 'Ref. Type',
+        label: t`Ref. Type`,
         fieldtype: 'Data',
       },
     ];

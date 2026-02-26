@@ -2,6 +2,9 @@ import { App, BrowserWindow } from 'electron';
 import fs from 'fs/promises';
 import path from 'path';
 
+const DEFAULT_PAGE_WIDTH_CM = 21;
+const DEFAULT_PAGE_HEIGHT_CM = 29.7;
+
 export async function saveHtmlAsPdf(
   html: string,
   savePath: string,
@@ -9,6 +12,9 @@ export async function saveHtmlAsPdf(
   width: number, // centimeters
   height: number // centimeters
 ): Promise<boolean> {
+  const w = Number(width) && width > 0 ? width : DEFAULT_PAGE_WIDTH_CM;
+  const h = Number(height) && height > 0 ? height : DEFAULT_PAGE_HEIGHT_CM;
+
   /**
    * Store received html as a file in a tempdir,
    * this will be loaded into the print view
@@ -18,12 +24,12 @@ export async function saveHtmlAsPdf(
   const htmlPath = path.join(tempRoot, `${filename}.html`);
   await fs.writeFile(htmlPath, html, { encoding: 'utf-8' });
 
-  const printWindow = await getInitializedPrintWindow(htmlPath, width, height);
+  const printWindow = await getInitializedPrintWindow(htmlPath, w, h);
   const printOptions = {
     margins: { top: 0, bottom: 0, left: 0, right: 0 }, // equivalent to previous 'marginType: 1'
     pageSize: {
-      height: height / 2.54, // Convert from centimeters to inches
-      width: width / 2.54, // Convert from centimeters to inches
+      height: h / 2.54, // Convert from centimeters to inches
+      width: w / 2.54, // Convert from centimeters to inches
     },
     printBackground: true,
   };
@@ -46,6 +52,12 @@ export async function getInitializedPrintWindow(
     show: false,
   });
 
+  if (process.env.PRINT_DEBUG) {
+    console.log('[Print Main] loadFile start');
+  }
   await printWindow.loadFile(printFilePath);
+  if (process.env.PRINT_DEBUG) {
+    console.log('[Print Main] loadFile done');
+  }
   return printWindow;
 }

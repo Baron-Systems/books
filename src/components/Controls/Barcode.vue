@@ -31,6 +31,7 @@
 </template>
 
 <script lang="ts">
+import { getItemNameByBarcode } from 'models/helpers';
 import { showToast } from 'src/utils/interactive';
 import { defineComponent } from 'vue';
 export default defineComponent({
@@ -66,7 +67,8 @@ export default defineComponent({
     },
     async selectItem(code: string) {
       const barcode = code.trim();
-      if (!/^[A-Za-z0-9]{12,}$/.test(barcode)) {
+      // Support EAN-8, EAN-13, UPC-A, Code 128/39, etc. (4–50 chars, alphanumeric or hyphen)
+      if (!/^[A-Za-z0-9\-]{4,50}$/.test(barcode)) {
         return this.error(this.t`Invalid barcode value ${barcode}.`);
       }
 
@@ -81,12 +83,7 @@ export default defineComponent({
       this.cooldown = barcode;
       setTimeout(() => (this.cooldown = ''), 100);
 
-      const items = (await this.fyo.db.getAll('Item', {
-        filters: { barcode },
-        fields: ['name'],
-      })) as { name: string }[];
-
-      const name = items?.[0]?.name;
+      const name = await getItemNameByBarcode(this.fyo, barcode);
 
       if (!name) {
         return this.error(this.t`Item with barcode ${barcode} not found.`);
@@ -124,7 +121,7 @@ export default defineComponent({
       }, 20);
     },
     async setItemFromBarcode() {
-      if (this.barcode.length < 12) {
+      if (this.barcode.length < 4) {
         return;
       }
 

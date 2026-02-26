@@ -19,6 +19,7 @@ export class Defaults extends Doc {
   purchaseInvoiceNumberSeries?: string;
   journalEntryNumberSeries?: string;
   paymentNumberSeries?: string;
+  partySettlementNumberSeries?: string;
   stockMovementNumberSeries?: string;
   shipmentNumberSeries?: string;
   purchaseReceiptNumberSeries?: string;
@@ -43,6 +44,12 @@ export class Defaults extends Doc {
   // Point of Sale
   posCashDenominations?: DefaultCashDenominations[];
   posCustomer?: string;
+
+  // Price Lists
+  salesPriceList?: string;
+  purchasePriceList?: string;
+  posPriceList?: string;
+  preventSellBelowCost?: boolean;
 
   //Buttons
   saveButtonColour?: string;
@@ -97,6 +104,11 @@ export class Defaults extends Doc {
     }),
     stockMovementPrintTemplate: () => ({ type: ModelNameEnum.StockMovement }),
     posCustomer: () => ({ role: PartyRoleEnum.Customer }),
+
+    // Price Lists
+    salesPriceList: () => ({ isEnabled: true, isSales: true }),
+    purchasePriceList: () => ({ isEnabled: true, isPurchase: true }),
+    posPriceList: () => ({ isEnabled: true, isSales: true }),
   };
 
   static filters: FiltersMap = this.commonFilters;
@@ -110,6 +122,10 @@ export class Defaults extends Doc {
     return () => !this.fyo.singles.InventorySettings?.enablePointOfSale;
   }
 
+  getPriceListHidden() {
+    return () => !this.fyo.singles.AccountingSettings?.enablePriceList;
+  }
+
   hidden: HiddenMap = {
     stockMovementNumberSeries: this.getInventoryHidden(),
     shipmentNumberSeries: this.getInventoryHidden(),
@@ -121,6 +137,10 @@ export class Defaults extends Doc {
     stockMovementPrintTemplate: this.getInventoryHidden(),
     posCashDenominations: this.getPointOfSaleHidden(),
     posCustomer: this.getPointOfSaleHidden(),
+    salesPriceList: this.getPriceListHidden(),
+    purchasePriceList: this.getPriceListHidden(),
+    posPriceList: this.getPriceListHidden(),
+    preventSellBelowCost: this.getPriceListHidden(),
     saveButtonColour: this.getPointOfSaleHidden(),
     cancelButtonColour: this.getPointOfSaleHidden(),
     submitButtonColour: this.getPointOfSaleHidden(),

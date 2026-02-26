@@ -46,6 +46,7 @@ export default async function setupInstance(
   await createAccountRecords(bankName, country, chartOfAccounts, fyo);
   await createRegionalRecords(country, fyo);
   await createDefaultEntries(fyo);
+  await createDefaultPriceLists(fyo);
   await createDefaultNumberSeries(fyo);
   await updateInventorySettings(fyo);
 
@@ -73,6 +74,38 @@ async function createDefaultEntries(fyo: Fyo) {
   for (const loc of getDefaultLocations(fyo)) {
     await checkAndCreateDoc(ModelNameEnum.Location, loc, fyo);
   }
+}
+
+async function createDefaultPriceLists(fyo: Fyo) {
+  const salesPriceListName = fyo.t`Standard Selling`;
+  const purchasePriceListName = fyo.t`Standard Buying`;
+
+  await checkAndCreateDoc(
+    ModelNameEnum.PriceList,
+    {
+      name: salesPriceListName,
+      isEnabled: true,
+      isSales: true,
+      isPurchase: false,
+    },
+    fyo
+  );
+
+  await checkAndCreateDoc(
+    ModelNameEnum.PriceList,
+    {
+      name: purchasePriceListName,
+      isEnabled: true,
+      isSales: false,
+      isPurchase: true,
+    },
+    fyo
+  );
+
+  const defaults = await fyo.doc.getDoc('Defaults');
+  await defaults.setAndSync('salesPriceList', salesPriceListName);
+  await defaults.setAndSync('purchasePriceList', purchasePriceListName);
+  await defaults.setAndSync('posPriceList', salesPriceListName);
 }
 
 async function initializeDatabase(dbPath: string, country: string, fyo: Fyo) {
@@ -103,6 +136,7 @@ async function updateAccountingSettings(
     bankName,
     fiscalYearStart,
     fiscalYearEnd,
+    enablePriceList: true,
   });
   return accountingSettings;
 }

@@ -52,7 +52,7 @@
       "fieldtype": "Check",
       "default": false,
       "readOnly": false,
-      "tab": "Settings"
+      "section": "Settings"
     },
     {
       "fieldname": "items",

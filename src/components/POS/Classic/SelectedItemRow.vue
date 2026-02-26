@@ -28,16 +28,18 @@
   </div>
 
   <div class="flex items-center" @click="emitSelectedRow">
-    <Int
+    <Float
       :df="{
         fieldname: 'quantity',
-        fieldtype: 'Int',
+        fieldtype: 'Float',
         label: 'Quantity',
       }"
       size="small"
       :border="false"
-      :value="getDisplayTransferQuantity()"
-      :read-only="true"
+      :min="0"
+      :value="isUOMConversionEnabled ? getDisplayTransferQuantity() : row.quantity"
+      :read-only="isReadOnly"
+      @change="onRowQuantityChange"
     />
     <div class="flex flex-col ml-1">
       <feather-icon
@@ -396,6 +398,16 @@ export default defineComponent({
   methods: {
     emitSelectedRow() {
       this.$emit('selectedRow', this.row);
+    },
+    onRowQuantityChange(value: string | number) {
+      const num = Number(value);
+      if (this.isUOMConversionEnabled) {
+        this.row.set('transferQuantity', num);
+        this.$emit('applyPricingRule');
+        this.$emit('runSinvFormulas');
+      } else {
+        this.setQuantity(num);
+      }
     },
     adjustQuantity(change: number) {
       let currentQuantity = this.row.quantity ?? 1;

@@ -50,8 +50,8 @@ export function setSchemaNameOnFields(schemaMap: SchemaMap): SchemaMap {
 
 function removeFields(schemaMap: SchemaMap): SchemaMap {
   for (const schemaName in schemaMap) {
-    const schema = schemaMap[schemaName]!;
-    if (schema.removeFields === undefined) {
+    const schema = schemaMap[schemaName];
+    if (!schema || schema.removeFields === undefined) {
       continue;
     }
 
@@ -79,13 +79,17 @@ function removeFields(schemaMap: SchemaMap): SchemaMap {
 function deepFreeze(schemaMap: SchemaMap) {
   Object.freeze(schemaMap);
   for (const schemaName in schemaMap) {
-    Object.freeze(schemaMap[schemaName]);
-    for (const key in schemaMap[schemaName]) {
+    const schema = schemaMap[schemaName];
+    if (!schema) {
+      continue;
+    }
+    Object.freeze(schema);
+    for (const key in schema) {
       // @ts-ignore
-      Object.freeze(schemaMap[schemaName][key]);
+      Object.freeze(schema[key]);
     }
 
-    for (const field of schemaMap[schemaName]?.fields ?? []) {
+    for (const field of schema?.fields ?? []) {
       Object.freeze(field);
     }
   }
@@ -101,7 +105,10 @@ export function addMetaFields(schemaMap: SchemaMap): SchemaMap {
   const submittableTree = getCombined(tree, metaSchemaMap.submittable);
 
   for (const name in schemaMap) {
-    const schema = schemaMap[name] as Schema;
+    const schema = schemaMap[name];
+    if (!schema) {
+      continue;
+    }
     if (schema.isSingle) {
       continue;
     }
@@ -126,13 +133,19 @@ export function addMetaFields(schemaMap: SchemaMap): SchemaMap {
 
 function addTitleField(schemaMap: SchemaMap) {
   for (const schemaName in schemaMap) {
-    schemaMap[schemaName]!.titleField ??= 'name';
+    const schema = schemaMap[schemaName];
+    if (schema) {
+      schema.titleField ??= 'name';
+    }
   }
 }
 
 function addNameField(schemaMap: SchemaMap) {
   for (const name in schemaMap) {
-    const schema = schemaMap[name] as Schema;
+    const schema = schemaMap[name];
+    if (!schema) {
+      continue;
+    }
     if (schema.isSingle) {
       continue;
     }

@@ -11,6 +11,7 @@ import {
   ListViewSettings,
   ValidationMap,
 } from 'fyo/model/types';
+import { isPesa } from 'fyo/utils';
 import { NotFoundError, ValidationError } from 'fyo/utils/errors';
 import {
   getDocStatusListColumn,
@@ -56,7 +57,12 @@ export class Payment extends Transactional {
     }
 
     if (changed === 'amount') {
-      this.updateReferenceOnAmountUpdate();
+      const forRefs = (this.for ?? []) as Doc[];
+      if (forRefs.length > 1) {
+        await this.distributeAmountToReferences();
+      } else if (forRefs.length === 1) {
+        this.updateReferenceOnAmountUpdate();
+      }
     }
   }
 
@@ -107,15 +113,146 @@ export class Payment extends Transactional {
     forReferences[0].amount = this.amount;
   }
 
+  /**
+   * Fetches outstanding invoices for the current party, ordered by date ASC (due order).
+   * Used for auto-distribution and "Fetch Outstanding Invoices" button.
+   */
+  async getOutstandingInvoicesForParty(): Promise<
+    { name: string; schemaName: string; outstandingAmount: Money; date: Date }[]
+  > {
+    const party = this.party;
+    const paymentType = this.paymentType;
+    if (!party || !paymentType) {
+      return [];
+    }
+
+    const schemaName =
+      paymentType === 'Receive'
+        ? ModelNameEnum.SalesInvoice
+        : ModelNameEnum.PurchaseInvoice;
+
+    const zero =
+      '0.' +
+      '0'.repeat(this.fyo.singles.SystemSettings?.internalPrecision ?? 11);
+
+    const rows = (await this.fyo.db.getAllRaw(schemaName, {
+      fields: ['name', 'outstandingAmount', 'date'],
+      filters: {
+        party,
+        submitted: true,
+        cancelled: false,
+        outstandingAmount: ['!=', zero],
+      },
+      orderBy: 'date',
+      order: 'asc',
+    })) as { name: string; outstandingAmount: string | number; date: string }[];
+
+    return rows
+      .map((r) => ({
+        name: r.name,
+        schemaName,
+        outstandingAmount: this.fyo.pesa(r.outstandingAmount),
+        date: new Date(r.date),
+      }))
+      .filter((r) => r.outstandingAmount.gt(0));
+  }
+
+  /**
+   * Distributes this.amount across this.for in order (by invoice date).
+   * Each row gets min(remaining amount, invoice outstanding). Uses Money, no precision loss.
+   */
+  async distributeAmountToReferences(): Promise<void> {
+    const forRefs = this.for ?? [];
+    if (forRefs.length === 0) return;
+
+    const totalPayment = this.amount ?? this.fyo.pesa(0);
+    if (totalPayment.lte(0)) return;
+
+    const zero = this.fyo.pesa(0);
+    for (const row of forRefs) {
+      row.amount = zero;
+    }
+
+    let remaining = totalPayment;
+
+    for (const row of forRefs) {
+      if (remaining.isZero()) break;
+
+      const referenceType = row.referenceType;
+      const referenceName = row.referenceName;
+      if (!referenceType || !referenceName) {
+        continue;
+      }
+
+      const refDoc = (await this.fyo.doc.getDoc(
+        referenceType,
+        referenceName
+      )) as Invoice;
+      const outstanding = refDoc?.outstandingAmount?.abs() ?? zero;
+
+      const allocate = remaining.gte(outstanding)
+        ? outstanding
+        : remaining;
+      row.amount = allocate;
+      remaining = remaining.sub(allocate);
+    }
+  }
+
+  /**
+   * Fetches all outstanding invoices for the current party, fills "for" table,
+   * sets amount to sum of outstanding, and runs distribution. Call from UI "Fetch Outstanding Invoices" button.
+   */
+  async fetchOutstandingInvoicesAndDistribute(): Promise<void> {
+    if (!this.party || !this.paymentType) {
+      throw new ValidationError(
+        this.fyo.t`Set Party and Payment Type before fetching outstanding invoices.`
+      );
+    }
+
+    const invoices = await this.getOutstandingInvoicesForParty();
+    if (invoices.length === 0) {
+      throw new ValidationError(
+        this.fyo.t`No outstanding invoices found for this party.`
+      );
+    }
+
+    const forRefs: PaymentFor[] = [];
+    let sumOutstanding = this.fyo.pesa(0);
+
+    for (const inv of invoices) {
+      const row = this.fyo.doc.getNewDoc('PaymentFor', {
+        referenceType: inv.schemaName,
+        referenceName: inv.name,
+        amount: inv.outstandingAmount,
+        parent: this.name,
+        parentSchemaName: this.schemaName,
+        parentFieldname: 'for',
+      }) as PaymentFor;
+      row.parentdoc = this;
+      sumOutstanding = sumOutstanding.add(inv.outstandingAmount);
+      forRefs.push(row);
+    }
+
+    this.for = forRefs;
+    this.amount = sumOutstanding;
+    await this.distributeAmountToReferences();
+  }
+
   async validate() {
     await super.validate();
     if (this.submitted) {
       return;
     }
 
+    // Sync allocation to current amount (e.g. user changed amount to partial; for rows must sum ≤ amount)
+    const forRefs = (this.for ?? []) as Doc[];
+    if (forRefs.length > 0 && (this.amount as Money)?.gt(0)) {
+      await this.distributeAmountToReferences();
+    }
+
     await this.validateFor();
-    this.validateAccounts();
-    this.validateTotalReferenceAmount();
+    await this.validateAccounts();
+    await this.validateTotalReferenceAmount();
     await this.validateReferences();
     await this.validateReferencesAreSet();
   }
@@ -151,11 +288,15 @@ export class Payment extends Transactional {
     }
   }
 
-  validateAccounts() {
+  async validateAccounts() {
     if (this.paymentAccount !== this.account || !this.account) {
       return;
     }
-
+    const methodDoc = await this.paymentMethodDoc();
+    const type = methodDoc?.type as string | undefined;
+    if (type === 'Customer Credit' || type === 'Vendor Advance') {
+      return;
+    }
     throw new this.fyo.errors.ValidationError(
       t`To Account and From Account can't be the same: ${
         this.account as string
@@ -163,7 +304,7 @@ export class Payment extends Transactional {
     );
   }
 
-  validateTotalReferenceAmount() {
+  async validateTotalReferenceAmount() {
     const forReferences = (this.for ?? []) as Doc[];
     if (forReferences.length === 0) {
       return;
@@ -172,6 +313,33 @@ export class Payment extends Transactional {
     const referenceAmountTotal = forReferences
       .map(({ amount }) => amount as Money)
       .reduce((a, b) => a.add(b), this.fyo.pesa(0));
+
+    const methodDoc = await this.paymentMethodDoc();
+    const type = methodDoc?.type as string | undefined;
+    const isBalanceApplication =
+      type === 'Customer Credit' || type === 'Vendor Advance';
+
+    if (isBalanceApplication) {
+      if (forReferences.length === 0 && (this.amount as Money).gt(0)) {
+        throw new ValidationError(
+          this.fyo.t`Balance application must reference at least one invoice.`
+        );
+      }
+      if (!(this.amount as Money).eq(referenceAmountTotal)) {
+        throw new ValidationError(
+          this.fyo.t`Balance application amount must equal allocated total: ${this.fyo.format(
+            referenceAmountTotal,
+            'Currency'
+          )}.`
+        );
+      }
+      if ((this.writeoff as Money)?.gt(0)) {
+        throw new ValidationError(
+          this.fyo.t`Write off is not allowed on balance application (Customer Credit / Vendor Advance).`
+        );
+      }
+      return;
+    }
 
     if (
       (this.amount as Money)
@@ -244,6 +412,44 @@ export class Payment extends Transactional {
 
     if (!this.referenceId) {
       throw new ValidationError(t`Reference Id not set.`);
+    }
+
+    await this.validateReferenceIdUniqueness();
+  }
+
+  async validateReferenceIdUniqueness() {
+    const referenceId = this.referenceId as string | undefined;
+    if (!referenceId) {
+      return;
+    }
+
+    const filters: QueryFilter = {
+      referenceId,
+      cancelled: false,
+    };
+
+    if (this.name) {
+      filters.name = ['!=', this.name];
+    }
+
+    if (this.party) {
+      filters.party = this.party;
+    }
+
+    if (this.paymentMethod) {
+      filters.paymentMethod = this.paymentMethod;
+    }
+
+    const existing = await this.fyo.db.getAll(ModelNameEnum.Payment, {
+      fields: ['name'],
+      filters,
+      limit: 1,
+    });
+
+    if (existing.length > 0) {
+      throw new ValidationError(
+        t`Reference Id ${referenceId} already exists for this party and payment method.`
+      );
     }
   }
 
@@ -339,13 +545,26 @@ export class Payment extends Transactional {
      * if Pay
      * -        account : Cash, Bank, etc
      * - paymentAccount : Creditors, etc
+     *
+     * Balance application (Customer Credit / Vendor Advance): Dr account, Cr account (same) — net zero, allocation only.
      */
-    await this.validateWriteOffAccount();
-    const posting: LedgerPosting = new LedgerPosting(this, this.fyo);
+    const methodDoc = await this.paymentMethodDoc();
+    const type = methodDoc?.type as string | undefined;
+    const isBalanceApplication =
+      type === 'Customer Credit' || type === 'Vendor Advance';
 
-    const paymentAccount = this.paymentAccount as string;
+    const posting: LedgerPosting = new LedgerPosting(this, this.fyo);
     const account = this.account as string;
     const amount = this.amount as Money;
+
+    if (isBalanceApplication) {
+      await posting.debit(account, amount);
+      await posting.credit(account, amount);
+      return posting;
+    }
+
+    await this.validateWriteOffAccount();
+    const paymentAccount = this.paymentAccount as string;
 
     await posting.debit(paymentAccount, amount);
     await posting.credit(account, amount);
@@ -398,7 +617,45 @@ export class Payment extends Transactional {
       this.validateReferenceType(row);
     }
 
-    await this.validateReferenceOutstanding();
+    await this.validateReferenceAllocationAmounts();
+    this.validateReferenceOutstanding();
+  }
+
+  /** No row may allocate more than that invoice's outstanding (Money-safe). */
+  async validateReferenceAllocationAmounts() {
+    for (const row of this.for ?? []) {
+      const allocated = row.amount ?? this.fyo.pesa(0);
+      if (!allocated.gt(0)) {
+        throw new ValidationError(
+          this.fyo.t`Allocated amount for each reference must be greater than 0.`
+        );
+      }
+
+      const referenceType = row.referenceType;
+      const referenceName = row.referenceName;
+      if (!referenceType || !referenceName) {
+        continue;
+      }
+
+      const refDoc = (await this.fyo.doc.getDoc(
+        referenceType,
+        referenceName
+      )) as Invoice;
+      const outstanding =
+        refDoc?.outstandingAmount?.abs() ?? this.fyo.pesa(0);
+      if (allocated.gt(outstanding)) {
+        const refName = row.referenceName ?? '';
+        throw new ValidationError(
+          this.fyo.t`Allocated amount ${this.fyo.format(
+            allocated,
+            'Currency'
+          )} for ${refName} cannot exceed outstanding ${this.fyo.format(
+            outstanding,
+            'Currency'
+          )}.`
+        );
+      }
+    }
   }
 
   validateReferenceType(row: PaymentFor) {
@@ -412,39 +669,17 @@ export class Payment extends Transactional {
     }
   }
 
-  async validateReferenceOutstanding() {
-    let outstandingAmount = this.fyo.pesa(0);
-    for (const row of this.for ?? []) {
-      const referenceDoc = (await this.fyo.doc.getDoc(
-        row.referenceType as string,
-        row.referenceName as string
-      )) as Invoice;
-
-      outstandingAmount = outstandingAmount.add(
-        referenceDoc.outstandingAmount?.abs() ?? 0
+  validateReferenceOutstanding() {
+    const amount = this.amount as Money;
+    if (amount.lte(0)) {
+      throw new ValidationError(
+        this.fyo.t`Payment amount: ${this.fyo.format(
+          this.amount!,
+          'Currency'
+        )} should be greater than 0.`
       );
     }
-
-    const amount = this.amount as Money;
-
-    if (amount.gt(0) && amount.lte(outstandingAmount)) {
-      return;
-    }
-
-    let message = this.fyo.t`Payment amount: ${this.fyo.format(
-      this.amount!,
-      'Currency'
-    )} should be less than Outstanding amount: ${this.fyo.format(
-      outstandingAmount,
-      'Currency'
-    )}.`;
-
-    if (amount.lte(0)) {
-      const amt = this.fyo.format(this.amount!, 'Currency');
-      message = this.fyo.t`Payment amount: ${amt} should be greater than 0.`;
-    }
-
-    throw new ValidationError(message);
+    // Allow overpayment: amount > sum(outstanding) is valid and becomes Customer Credit / Vendor Advance
   }
 
   async afterSubmit() {
@@ -454,32 +689,45 @@ export class Payment extends Transactional {
   }
 
   async updateReferenceDocOutstanding() {
+    const isMoney = isPesa as unknown as (v: unknown) => v is Money;
     for (const row of this.for ?? []) {
-      const referenceDoc = await this.fyo.doc.getDoc(
+      const current = (await this.fyo.db.get(
         row.referenceType!,
-        row.referenceName
-      );
-
-      const previousOutstandingAmount = referenceDoc.outstandingAmount as Money;
+        row.referenceName as string,
+        ['outstandingAmount']
+      )) as { outstandingAmount?: Money | number | string };
+      const prevRaw = current?.outstandingAmount;
+      const previousOutstandingAmount: Money =
+        prevRaw != null
+          ? isMoney(prevRaw)
+            ? prevRaw
+            : this.fyo.pesa(prevRaw)
+          : this.fyo.pesa(0);
       const outstandingAmount = previousOutstandingAmount.sub(row.amount!);
-      await referenceDoc.setAndSync({ outstandingAmount });
+      await this.fyo.db.update(row.referenceType!, {
+        name: row.referenceName,
+        outstandingAmount,
+      });
     }
   }
 
   async beforeSync(): Promise<void> {
     await super.beforeSync();
 
-    for (const row of this.for ?? []) {
+    const forRefs = (this.for ?? []) as Doc[];
+    const allocatedTotal = forRefs
+      .map((r) => r.amount as Money)
+      .reduce((a, b) => a.add(b), this.fyo.pesa(0));
+
+    for (const row of forRefs) {
       if (!this.fyo.singles.AccountingSettings?.enablePartialPayment) {
         const amount = (this.writeoff as Money).isZero()
           ? (this.amount as Money)
           : (this.amountPaid as Money);
 
-        const totalAmount = this.totalAmount as Money;
-        if (amount.lt(totalAmount)) {
-          if (this.writeoff?.isZero()) {
-            this.amount = totalAmount;
-            row.amountPaid = this.fyo.pesa(0);
+        if (amount.lt(allocatedTotal)) {
+          if ((this.writeoff as Money).isZero()) {
+            this.amount = allocatedTotal;
             throw new ValidationError(
               this.fyo.t`Enable Partial payment to pay partial amount`
             );
@@ -500,17 +748,25 @@ export class Payment extends Transactional {
   }
 
   async _revertReferenceOutstanding() {
+    const isMoney = isPesa as unknown as (v: unknown) => v is Money;
     for (const ref of this.for ?? []) {
-      const refDoc = await this.fyo.doc.getDoc(
+      const current = (await this.fyo.db.get(
         ref.referenceType!,
-        ref.referenceName
-      );
-
-      const outstandingAmount = (refDoc.outstandingAmount as Money).add(
-        ref.amount!
-      );
-
-      await refDoc.setAndSync({ outstandingAmount });
+        ref.referenceName as string,
+        ['outstandingAmount']
+      )) as { outstandingAmount?: Money | number | string };
+      const prevRaw = current?.outstandingAmount;
+      const previous: Money =
+        prevRaw != null
+          ? isMoney(prevRaw)
+            ? prevRaw
+            : this.fyo.pesa(prevRaw)
+          : this.fyo.pesa(0);
+      const outstandingAmount = previous.add(ref.amount!);
+      await this.fyo.db.update(ref.referenceType!, {
+        name: ref.referenceName,
+        outstandingAmount,
+      });
     }
   }
 
@@ -676,11 +932,19 @@ export class Payment extends Transactional {
             return PaymentTypeEnum.Receive;
           }
         } else if (partyDoc.role === PartyRoleEnum.Both) {
-          if (refDoc?.isSales && refDoc.isReturn) {
-            return PaymentTypeEnum.Pay;
-          } else {
+          if (!refDoc) {
+            return this.paymentType;
+          }
+          if (refDoc.isSales) {
+            if (refDoc.isReturn) {
+              return PaymentTypeEnum.Pay;
+            }
             return PaymentTypeEnum.Receive;
           }
+          if (refDoc.isReturn) {
+            return PaymentTypeEnum.Receive;
+          }
+          return PaymentTypeEnum.Pay;
         }
 
         if (outstanding?.isZero() ?? true) {
@@ -693,10 +957,7 @@ export class Payment extends Transactional {
         return PaymentTypeEnum.Pay;
       },
     },
-    amount: {
-      formula: () => this.getSum('for', 'amount', false),
-      dependsOn: ['for'],
-    },
+    // amount: no formula so user amount can exceed sum(for) for Customer Credit / Vendor Advance; set by updateAmountOnReferenceUpdate when "for" changes
     amountPaid: {
       formula: () => this.amount!.sub(this.writeoff!),
       dependsOn: ['amount', 'writeoff', 'for'],
@@ -711,37 +972,14 @@ export class Payment extends Transactional {
   };
 
   validations: ValidationMap = {
-    amount: async (value: DocValue) => {
+    amount: (value: DocValue) => {
       if ((value as Money).isNegative()) {
         throw new ValidationError(
           this.fyo.t`Payment amount cannot be less than zero.`
         );
       }
 
-      if (((this.for ?? []) as Doc[]).length === 0) {
-        return;
-      }
-
-      if (!this.totalAmount) {
-        for (const row of this.for ?? []) {
-          const referenceDoc = (await this.fyo.doc.getDoc(
-            row.referenceType as string,
-            row.referenceName as string
-          )) as Invoice;
-
-          this.totalAmount = referenceDoc.outstandingAmount?.abs();
-        }
-      }
-
-      if ((value as Money).gt(this.totalAmount as Money)) {
-        this.amount = this.initialAmount;
-        throw new ValidationError(
-          this.fyo.t`Payment amount cannot exceed ${this.fyo.format(
-            this.totalAmount,
-            'Currency'
-          )}.`
-        );
-      } else if ((value as Money).isZero()) {
+      if ((value as Money).isZero()) {
         throw new ValidationError(
           this.fyo.t`Payment amount cannot be ${this.fyo.format(
             value as Money,
@@ -749,6 +987,8 @@ export class Payment extends Transactional {
           )}.`
         );
       }
+
+      // Allow overpayment (amount > sum of outstanding) — becomes Customer Credit / Vendor Advance; no cap
     },
   };
 

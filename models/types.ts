@@ -20,12 +20,16 @@ export enum ModelNameEnum {
   GetStarted = 'GetStarted',
   Defaults = 'Defaults',
   Item = 'Item',
+  ItemBarcode = 'ItemBarcode',
+  ItemPriceListItem = 'ItemPriceListItem',
   ItemGroup = 'ItemGroup',
   ItemEnquiry = 'ItemEnquiry',
   UOM = 'UOM',
   UOMConversionItem = 'UOMConversionItem',
   JournalEntry = 'JournalEntry',
   JournalEntryAccount = 'JournalEntryAccount',
+  JournalEntryTemplate = 'JournalEntryTemplate',
+  JournalEntryTemplateLine = 'JournalEntryTemplateLine',
   Misc = 'Misc',
   NumberSeries = 'NumberSeries',
   Lead = 'Lead',
@@ -79,6 +83,7 @@ export enum ModelNameEnum {
   ERPNextSyncSettings = 'ERPNextSyncSettings',
   ERPNextSyncQueue = 'ERPNextSyncQueue',
   FetchFromERPNextQueue = 'FetchFromERPNextQueue',
+  User = 'User',
 }
 
 export type ModelName = keyof typeof ModelNameEnum;

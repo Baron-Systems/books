@@ -11,7 +11,7 @@
       overflow-y-auto
       custom-scroll custom-scroll-thumb2
     "
-    style="height: 83vh"
+    style="height: 100%"
   >
     <!-- Items Grid -->
     <div

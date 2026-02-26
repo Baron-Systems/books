@@ -132,9 +132,21 @@ export class Converter {
     const fieldValueMap = this.db.fieldMap[schemaName];
     const rawValueMap: RawValueMap = {};
 
-    for (const fieldname in docValueMap) {
-      const field = fieldValueMap[fieldname];
+    // IMPORTANT:
+    // `db.update()` is used both for full document writes (from Doc.sync) and for
+    // partial updates (e.g. "update outstandingAmount" after submit). When we
+    // serialize by iterating over ALL schema fields, any missing key in
+    // `docValueMap` gets treated as null/0 and overwrites existing DB values.
+    //
+    // Therefore we only serialize the keys explicitly present in `docValueMap`.
+    // Full writes already include all fields via `Doc.getValidDict()`.
+    for (const fieldname of Object.keys(docValueMap)) {
+      const field = fieldValueMap?.[fieldname];
       const docValue = docValueMap[fieldname];
+
+      if (!field) {
+        continue;
+      }
 
       if (Array.isArray(docValue)) {
         const parentSchemaName = (field as TargetField).target;
@@ -148,7 +160,7 @@ export class Converter {
         });
       } else {
         rawValueMap[fieldname] = Converter.toRawValue(
-          docValue,
+          docValue ?? null,
           field,
           this.fyo
         );
@@ -261,6 +273,11 @@ function toDocFloat(value: RawValue, field: Field): number {
 }
 
 function toDocCheck(value: RawValue, field: Field): boolean {
+  // Treat null/empty as unchecked (false). Older databases may contain NULLs.
+  if (value === null || value === '' || value === undefined) {
+    return false;
+  }
+
   if (typeof value === 'boolean') {
     return value;
   }
@@ -385,6 +402,11 @@ function toRawDateTime(value: DocValue, field: Field): string | null {
 }
 
 function toRawCheck(value: DocValue, field: Field): number {
+  // Treat null/undefined as unchecked (0)
+  if (value === null || value === undefined) {
+    return 0;
+  }
+
   if (typeof value === 'number') {
     value = Boolean(value);
   }

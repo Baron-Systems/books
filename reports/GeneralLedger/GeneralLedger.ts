@@ -32,6 +32,8 @@ export class GeneralLedger extends LedgerReport {
   referenceType: ReferenceType = 'All';
   groupBy: 'none' | 'party' | 'account' | 'referenceName' = 'none';
   _rawData: LedgerEntry[] = [];
+  /** Opening balance when party or account filter + fromDate (for summary/print) */
+  openingBalance = 0;
 
   constructor(fyo: Fyo) {
     super(fyo);
@@ -57,6 +59,26 @@ export class GeneralLedger extends LedgerReport {
     const { totalDebit, totalCredit } = this._getTotalsAndSetBalance(map);
     const consolidated = this._consolidateEntries(map);
 
+    const hasPartyOrAccount = !!(this.party || this.account);
+    const periodClosing = totalDebit - totalCredit;
+    this.openingBalance = 0;
+    if (hasPartyOrAccount && this.fromDate) {
+      this.openingBalance = await this._getOpeningBalance();
+      consolidated.unshift({
+        name: -2,
+        account: t`Opening`,
+        date: null,
+        debit: this.openingBalance >= 0 ? this.openingBalance : 0,
+        credit: this.openingBalance < 0 ? -this.openingBalance : 0,
+        balance: this.openingBalance,
+        referenceType: '',
+        referenceName: '',
+        party: '',
+        reverted: false,
+        reverts: '',
+      });
+    }
+
     /**
      * Push a blank row if last row isn't blank
      */
@@ -64,16 +86,14 @@ export class GeneralLedger extends LedgerReport {
       this._pushBlankEntry(consolidated);
     }
 
-    /**
-     * Set the closing row
-     */
+    const closingBalance = this.openingBalance + periodClosing;
     consolidated.push({
       name: -2, // Bold
       account: t`Closing`,
       date: null,
       debit: totalDebit,
       credit: totalCredit,
-      balance: totalDebit - totalCredit,
+      balance: closingBalance,
       referenceType: '',
       referenceName: '',
       party: '',
@@ -82,7 +102,72 @@ export class GeneralLedger extends LedgerReport {
     });
 
     this.reportData = this._convertEntriesToReportData(consolidated);
+    const hasOpening = hasPartyOrAccount && !!this.fromDate;
+    this._setTotalsRow(hasOpening, totalDebit, totalCredit, closingBalance);
     this.loading = false;
+  }
+
+  async _getOpeningBalance(): Promise<number> {
+    const filters = this._getOpeningBalanceFilters();
+    const entries = (await this.fyo.db.getAllRaw(
+      ModelNameEnum.AccountingLedgerEntry,
+      {
+        fields: ['debit', 'credit'],
+        filters,
+      }
+    )) as { debit: string | number; credit: string | number }[];
+    let balance = 0;
+    for (const e of entries) {
+      const d = typeof e.debit === 'number' ? e.debit : parseFloat(String(e.debit ?? 0));
+      const c = typeof e.credit === 'number' ? e.credit : parseFloat(String(e.credit ?? 0));
+      balance += Math.abs(d) - Math.abs(c);
+    }
+    return balance;
+  }
+
+  _getOpeningBalanceFilters(): QueryFilter {
+    const filters: QueryFilter = {};
+    const stringFilters = ['account', 'party', 'referenceName'];
+    for (const sf of stringFilters) {
+      const value = this[sf];
+      if (value !== undefined) filters[sf] = value as string;
+    }
+    if (this.referenceType !== 'All') filters.referenceType = this.referenceType as string;
+    if (this.fromDate) filters.date = ['<', this.fromDate as string];
+    if (!this.reverted) filters.reverted = false;
+    return filters;
+  }
+
+  _setTotalsRow(
+    hasOpening: boolean,
+    totalDebit: number,
+    totalCredit: number,
+    closingBalance: number
+  ): void {
+    if (!hasOpening || !this.columns.length) {
+      this.totalsRow = null;
+      return;
+    }
+    const format = (n: number) =>
+      this.fyo.format(n, FieldTypeEnum.Currency);
+    const cells = this.columns.map((col) => {
+      const align: 'left' | 'right' | 'center' = col.align ?? 'left';
+      const width = col.width ?? 1;
+      if (col.fieldname === 'account') {
+        return { value: t`Summary`, rawValue: t`Summary`, align, width, bold: true };
+      }
+      if (col.fieldname === 'debit') {
+        return { value: format(totalDebit), rawValue: totalDebit, align, width, bold: true };
+      }
+      if (col.fieldname === 'credit') {
+        return { value: format(totalCredit), rawValue: totalCredit, align, width, bold: true };
+      }
+      if (col.fieldname === 'balance') {
+        return { value: format(closingBalance), rawValue: closingBalance, align, width, bold: true };
+      }
+      return { value: '', rawValue: undefined, align, width };
+    });
+    this.totalsRow = { cells };
   }
 
   _setIndexOnEntries(map: GroupedMap) {

@@ -78,6 +78,42 @@
             </div>
           </div>
         </template>
+        <!-- Totals Row (scrolls with list) -->
+        <div
+          v-if="report.totalsRow"
+          class="
+            flex
+            items-center
+            w-max
+            px-4
+            border-t-2
+            dark:border-gray-700
+            bg-gray-100
+            dark:bg-gray-800
+          "
+          :style="{
+            height: `${hconst}px`,
+            minWidth: `calc(var(--w-desk) - var(--w-scrollbar))`,
+          }"
+        >
+          <div
+            v-for="(cell, c) in report.totalsRow.cells"
+            :key="'totals-' + c"
+            :style="getCellStyle(cell, c)"
+            class="
+              text-base
+              font-semibold
+              px-3
+              flex-shrink-0
+              overflow-x-auto
+              whitespace-nowrap
+              no-scrollbar
+            "
+            :class="[getCellColorClass(cell)]"
+          >
+            {{ cell.value }}
+          </div>
+        </div>
       </WithScroll>
       <!-- Report Rows Container -->
     </div>

@@ -47,6 +47,7 @@ import {
   getStockBalanceEntries,
   getStockLedgerEntries,
 } from 'reports/inventory/helpers';
+import { StockQueue } from './inventory/stockQueue';
 import { LoyaltyPointEntry } from './baseModels/LoyaltyPointEntry/LoyaltyPointEntry';
 
 export function getQuoteActions(
@@ -58,6 +59,20 @@ export function getQuoteActions(
 
 export function getLeadActions(fyo: Fyo): Action[] {
   return [getCreateCustomerAction(fyo), getSalesQuoteAction(fyo)];
+}
+
+/**
+ * Resolve item name by barcode from ItemBarcode child table.
+ */
+export async function getItemNameByBarcode(
+  fyo: Fyo,
+  barcode: string
+): Promise<string | null> {
+  const rows = (await fyo.db.getAll(ModelNameEnum.ItemBarcode, {
+    filters: { barcode },
+    fields: ['parent'],
+  })) as { parent: string }[];
+  return rows?.[0]?.parent ?? null;
 }
 
 export function getInvoiceActions(
@@ -1247,23 +1262,160 @@ export async function getItemRateFromPriceList(
     return;
   }
 
+  const candidates = (priceList.priceListItem ?? []).filter(
+    (pli) => pli.item === item
+  );
+
+  if (!candidates.length) {
+    return;
+  }
+
+  // Prefer exact unit match when available.
+  // Note: during row creation/formula evaluation the units may not yet be set,
+  // so we fallback to the only candidate when unambiguous.
   const unit = doc.unit;
   const transferUnit = doc.transferUnit;
-  const plItem = priceList.priceListItem?.find((pli) => {
-    if (pli.item !== item) {
-      return false;
-    }
 
-    if (transferUnit && pli.unit !== transferUnit) {
-      return false;
-    } else if (unit && pli.unit !== unit) {
-      return false;
+  if (transferUnit) {
+    const match = candidates.find((pli) => pli.unit === transferUnit);
+    if (match?.rate) {
+      return match.rate;
     }
+  }
 
-    return true;
+  if (unit) {
+    const match = candidates.find((pli) => pli.unit === unit);
+    if (match?.rate) {
+      return match.rate;
+    }
+  }
+
+  const unitless = candidates.find((pli) => !pli.unit);
+  if (unitless?.rate) {
+    return unitless.rate;
+  }
+
+  // If there's exactly one rate for this item in the price list, use it even if
+  // units haven't been resolved yet.
+  if (candidates.length === 1) {
+    return candidates[0].rate;
+  }
+
+  return;
+}
+
+/**
+ * Get item rate from a price list by item name and optional unit.
+ * Used for displaying rates in POS item list when a price list is selected.
+ */
+export async function getItemRateFromPriceListForItem(
+  fyo: Fyo,
+  itemName: string,
+  unit: string | undefined,
+  priceListName: string
+): Promise<Money | undefined> {
+  if (!priceListName || !itemName) {
+    return undefined;
+  }
+
+  const priceList = await fyo.doc.getDoc(
+    ModelNameEnum.PriceList,
+    priceListName
+  );
+
+  if (!(priceList instanceof PriceList)) {
+    return undefined;
+  }
+
+  const candidates = (priceList.priceListItem ?? []).filter(
+    (pli) => pli.item === itemName
+  );
+
+  if (!candidates.length) {
+    return undefined;
+  }
+
+  if (unit) {
+    const match = candidates.find((pli) => pli.unit === unit);
+    if (match?.rate) {
+      return match.rate;
+    }
+  }
+
+  const unitless = candidates.find((pli) => !pli.unit);
+  if (unitless?.rate) {
+    return unitless.rate;
+  }
+
+  if (candidates.length === 1) {
+    return candidates[0].rate;
+  }
+
+  return undefined;
+}
+
+/**
+ * Returns the effective cost/valuation rate for an item.
+ * For inventory items: weighted average valuation from stock ledger (FIFO or Moving Average per settings).
+ * For non-inventory items: returns zero (no cost check).
+ */
+export async function getItemCostRate(
+  fyo: Fyo,
+  itemName: string
+): Promise<Money> {
+  const trackItem = await fyo.getValue(
+    ModelNameEnum.Item,
+    itemName,
+    'trackItem'
+  );
+  if (!trackItem) {
+    return fyo.pesa(0);
+  }
+
+  const valuationMethod =
+    (fyo.singles.InventorySettings?.valuationMethod as ValuationMethod) ??
+    ValuationMethod.FIFO;
+
+  const rawSLEs = await getRawStockLedgerEntries(fyo, {
+    item: itemName,
   });
 
-  return plItem?.rate;
+  type Location = string;
+  type Batch = string;
+  const queues: Record<Location, Record<Batch, StockQueue>> = {};
+
+  for (const sle of rawSLEs) {
+    const rate = safeParseFloat(sle.rate);
+    const quantity = sle.quantity ?? 0;
+    const location = sle.location ?? '-';
+    const batch = sle.batch ?? '-';
+
+    queues[location] ??= {};
+    queues[location][batch] ??= new StockQueue();
+
+    const q = queues[location][batch];
+    if (quantity > 0) {
+      q.inward(rate, quantity);
+    } else {
+      q.outward(-quantity);
+    }
+  }
+
+  let totalValue = 0;
+  let totalQty = 0;
+  for (const loc of Object.values(queues)) {
+    for (const q of Object.values(loc)) {
+      totalValue += q.value;
+      totalQty += q.quantity;
+    }
+  }
+
+  if (totalQty <= 0) {
+    return fyo.pesa(0);
+  }
+
+  const avgRate = totalValue / totalQty;
+  return fyo.pesa(avgRate);
 }
 
 export function filterPricingRules(

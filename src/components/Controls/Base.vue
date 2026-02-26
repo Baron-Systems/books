@@ -71,10 +71,18 @@ export default defineComponent({
   computed: {
     doc(): Doc | undefined {
       // @ts-ignore
-      const doc = this.injectedDoc;
+      const injected = this.injectedDoc;
 
-      if (doc instanceof Doc) {
-        return doc;
+      // Parent may provide doc as a ref/computed (e.g. ClosePOSShiftModal)
+      const value =
+        injected &&
+        typeof injected === 'object' &&
+        'value' in injected
+          ? (injected as { value: unknown }).value
+          : injected;
+
+      if (value instanceof Doc) {
+        return value;
       }
 
       return undefined;

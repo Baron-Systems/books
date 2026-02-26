@@ -19,6 +19,173 @@ import { Payment } from 'models/baseModels/Payment/Payment';
 export type PrintTemplateHint = {
   [key: string]: string | PrintTemplateHint | PrintTemplateHint[];
 };
+
+export type PartyStatementRow = {
+  date: string;
+  typeLabel: string;
+  reference: string;
+  debit: string;
+  credit: string;
+  displayAmount?: string;
+  debitNum?: number;
+  creditNum?: number;
+  schemaName?: string;
+  runningBalance?: string;
+  runningBalanceNum?: number;
+  isOpeningRow?: boolean;
+  details?: { item: string; description?: string; quantity: string; rate: string; amount: string }[];
+};
+
+export type PartyStatementPrintParams = {
+  /** Main report title (e.g. كشف حساب) shown in center */
+  title: string;
+  partyName: string;
+  companyName: string;
+  companyAddress?: string;
+  companyPhone?: string;
+  partyPhone?: string;
+  role?: 'Customer' | 'Supplier' | 'Both';
+  /** Data URL for logo image when displayLogo and logo exist in PrintSettings */
+  logoImageUrl?: string;
+  rows: PartyStatementRow[];
+  openingBalance?: number;
+  closingBalance?: number;
+  totalDebit?: number;
+  totalCredit?: number;
+  currentBalance?: number;
+  dateRange?: { from: string; to: string };
+  labels: Record<string, string>;
+};
+
+export function buildPartyStatementPrintHtml(params: PartyStatementPrintParams): string {
+  const {
+    title,
+    partyName,
+    companyName,
+    companyAddress = '',
+    companyPhone = '',
+    partyPhone = '',
+    logoImageUrl,
+    rows,
+    openingBalance,
+    closingBalance,
+    totalDebit,
+    totalCredit,
+    currentBalance,
+    dateRange,
+    labels,
+    role = 'Customer',
+  } = params;
+
+  const debitTotal = totalDebit ?? rows.reduce((s, r) => s + (r.debitNum ?? 0), 0);
+  const creditTotal = totalCredit ?? rows.reduce((s, r) => s + (r.creditNum ?? 0), 0);
+  const opening = openingBalance ?? 0;
+  const closing = closingBalance ?? opening + debitTotal - creditTotal;
+  const liveBalance = currentBalance ?? closing;
+  const formatNum = (n: number) =>
+    (Math.round(n * 100) / 100).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  const formatSignedNum = (n: number) => (n < 0 ? `-${formatNum(Math.abs(n))}` : formatNum(n));
+
+  const lType = labels.type ?? 'Type';
+  const lDate = labels.date ?? 'Date';
+  const lAmount = labels.amountCol ?? labels.amount ?? 'Amount';
+  const lRef = labels.reference ?? 'Reference';
+  const lBalance = labels.balance ?? 'Balance';
+  const lOpening = labels.openingBalance ?? 'Opening';
+  const lClosing = labels.closingBalance ?? 'Closing';
+  const lCurrent = labels.currentBalance ?? 'Current';
+  const lDebit = labels.debit ?? 'Debit';
+  const lCredit = labels.credit ?? 'Credit';
+
+  const safeAttr = (s: string) => String(s).replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+  const logoHtml = logoImageUrl
+    ? `<img src="${safeAttr(logoImageUrl)}" alt="" style="max-width:100px;max-height:70px;object-fit:contain;display:block;" />`
+    : `<div style="width:100px;height:70px;background:#1e3a5f;border-radius:8px;display:flex;align-items:center;justify-content:center;color:#fff;font-size:12px;">${escapeHtml(labels.logo ?? 'Logo')}</div>`;
+
+  const th = (text: string) => `<th style="text-align:right;padding:0.4rem 0.5rem;border:1px solid #ccc;background:#e8e8e8;">${escapeHtml(text)}</th>`;
+  const td = (text: string) => `<td style="padding:0.35rem 0.5rem;border:1px solid #ddd;">${escapeHtml(text)}</td>`;
+  const tdNum = (text: string) => `<td style="padding:0.35rem 0.5rem;border:1px solid #ddd;text-align:right;">${escapeHtml(text)}</td>`;
+
+  const colHeaders = th(lType) + th(lDate) + th(lRef) + th(lAmount) + th(lBalance);
+
+  let tableRows = '';
+  for (let i = 0; i < rows.length; i++) {
+    const r = rows[i];
+    const amountCol = r.displayAmount ?? (r.debit ? r.debit : r.credit);
+    const runningCol = r.runningBalance ?? '';
+    const rowBg = i % 2 === 0 ? '#fff' : '#f5f5f5';
+    tableRows += `<tr style="background:${rowBg}">${td(r.typeLabel)}${td(r.date)}${td(r.reference ?? '')}${tdNum(amountCol)}${tdNum(runningCol)}</tr>`;
+    if (r.details?.length) {
+      for (const d of r.details) {
+        const detailBg = rowBg === '#fff' ? '#fafafa' : '#f0f0f0';
+        tableRows += `<tr style="background:${detailBg}">${td('')}${td('')}${td(d.item)}${tdNum(d.amount)}${tdNum('')}</tr>`;
+      }
+    }
+    if (i < rows.length - 1) {
+      tableRows += `<tr><td colspan="5" style="padding:0;border:0;border-bottom:2px solid #333;height:0.35rem;"></td></tr>`;
+    }
+  }
+
+  return `
+<main class="party-statement" dir="rtl" style="padding:1rem;font-family:sans-serif;font-size:14px;max-width:21cm;">
+  <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:0.75rem;gap:1rem;">
+    <div style="width:100px;flex-shrink:0;">${logoHtml}</div>
+    <div style="flex:1;text-align:center;">
+      <h1 style="margin:0;font-size:1.35rem;font-weight:bold;">${escapeHtml(title)}</h1>
+    </div>
+    <div style="width:100px;flex-shrink:0;"></div>
+  </div>
+  <div style="margin-bottom:0.75rem;">
+    <p style="margin:0 0 0.2rem 0;"><strong>${escapeHtml(labels.company ?? 'Company')}:</strong> ${escapeHtml(companyName)}</p>
+    ${companyAddress ? `<p style="margin:0 0 0.2rem 0;"><strong>${escapeHtml(labels.address ?? 'Address')}:</strong> ${escapeHtml(companyAddress)}</p>` : ''}
+    ${companyPhone ? `<p style="margin:0 0 0.2rem 0;"><strong>${escapeHtml(labels.phone ?? 'Phone')}:</strong> ${escapeHtml(companyPhone)}</p>` : ''}
+  </div>
+  <div style="margin-bottom:0.75rem;">
+    <p style="margin:0 0 0.2rem 0;"><strong>${escapeHtml(labels.party ?? 'Party')}:</strong> ${escapeHtml(partyName)}</p>
+    ${partyPhone ? `<p style="margin:0 0 0.2rem 0;"><strong>${escapeHtml(labels.partyPhone ?? 'Phone')}:</strong> ${escapeHtml(partyPhone)}</p>` : ''}
+  </div>
+  ${dateRange ? `<p style="margin:0 0 0.5rem 0;">${escapeHtml(lDate)}: ${escapeHtml(dateRange.from)} – ${escapeHtml(dateRange.to)}</p>` : ''}
+  <div style="display:flex;gap:1rem;margin-bottom:1rem;">
+    <div style="flex:1;background:#e8e8e8;padding:0.5rem 0.75rem;border-radius:6px;text-align:center;border:1px solid #ccc;">
+      <div style="font-size:0.9em;font-weight:bold;color:#222;">${escapeHtml(lOpening)}</div>
+      <div style="font-weight:bold;font-size:1.1em;font-variant-numeric:tabular-nums;">${escapeHtml(formatSignedNum(opening))}</div>
+    </div>
+    <div style="flex:1;background:#e8e8e8;padding:0.5rem 0.75rem;border-radius:6px;text-align:center;border:1px solid #ccc;">
+      <div style="font-size:0.9em;font-weight:bold;color:#222;">${escapeHtml(lDebit)}</div>
+      <div style="font-weight:bold;font-size:1.1em;font-variant-numeric:tabular-nums;">${escapeHtml(formatSignedNum(debitTotal))}</div>
+    </div>
+    <div style="flex:1;background:#e8e8e8;padding:0.5rem 0.75rem;border-radius:6px;text-align:center;border:1px solid #ccc;">
+      <div style="font-size:0.9em;font-weight:bold;color:#222;">${escapeHtml(lCredit)}</div>
+      <div style="font-weight:bold;font-size:1.1em;font-variant-numeric:tabular-nums;">${escapeHtml(formatSignedNum(creditTotal))}</div>
+    </div>
+    <div style="flex:1;background:#e8e8e8;padding:0.5rem 0.75rem;border-radius:6px;text-align:center;border:1px solid #ccc;">
+      <div style="font-size:0.9em;font-weight:bold;color:#222;">${escapeHtml(lClosing)}</div>
+      <div style="font-weight:bold;font-size:1.1em;font-variant-numeric:tabular-nums;">${escapeHtml(formatSignedNum(closing))}</div>
+    </div>
+    <div style="flex:1;background:#e8e8e8;padding:0.5rem 0.75rem;border-radius:6px;text-align:center;border:1px solid #ccc;">
+      <div style="font-size:0.9em;font-weight:bold;color:#222;">${escapeHtml(lCurrent)}</div>
+      <div style="font-weight:bold;font-size:1.1em;font-variant-numeric:tabular-nums;">${escapeHtml(formatSignedNum(liveBalance))}</div>
+    </div>
+  </div>
+  <table style="width:100%;border-collapse:collapse;border:1px solid #ccc;">
+    <thead><tr>${colHeaders}</tr></thead>
+    <tbody>${tableRows}</tbody>
+  </table>
+</main>`;
+}
+
+function escapeHtml(s: string): string {
+  const m: Record<string, string> = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' };
+  return String(s).replace(/[&<>"']/g, (c) => m[c] ?? c);
+}
+
+export async function printHtmlDocument(
+  html: string,
+  opts: { width: number; height: number; dir?: string }
+): Promise<void> {
+  const wrapped = opts.dir ? `<div dir="${escapeHtml(opts.dir)}">${html}</div>` : html;
+  await getPathAndMakePDF('Party Statement', wrapped, opts.width, opts.height, true);
+}
 type PrintTemplateData = Record<string, unknown>;
 type TemplateUpdateItem = {
   name: string;
@@ -38,6 +205,7 @@ const printSettingsFields = [
   'address',
   'companyName',
   'amountInWords',
+  'displayTime',
   'displaytermsandconditions',
   'termsAndConditions',
 ];
@@ -60,8 +228,17 @@ export async function getPrintTemplatePropValues(
     paymentId = await (doc as SalesInvoice).getPaymentIds();
 
     if (paymentId && paymentId.length) {
-      const paymentDetails = await getPaymentDetails(doc, paymentId);
-      (values.doc as PrintTemplateData).paymentDetails = paymentDetails;
+      const { paymentDetails: details, totalPaid: paidSum } = await getPaymentDetailsWithTotal(
+        doc,
+        paymentId
+      );
+      (values.doc as PrintTemplateData).paymentDetails = details;
+      if (paidSum) {
+        (values.doc as PrintTemplateData).totalPaid = doc.fyo.format(
+          paidSum,
+          ModelNameEnum.Currency
+        );
+      }
     }
   }
 
@@ -135,14 +312,28 @@ export async function getPrintTemplatePropValues(
 
   return values;
 }
-async function getPaymentDetails(doc: Doc, paymentId: string[]) {
+async function getPaymentDetailsWithTotal(
+  doc: Doc,
+  paymentId: string[]
+): Promise<{
+  paymentDetails: {
+    amount: string;
+    amountPaid: string;
+    paymentMethod: string;
+    outstandingAmount: string;
+  }[];
+  totalPaid: Money | null;
+}> {
   const paymentIds = paymentId.sort();
   const paymentDetails = [];
   let outstandingAmount = doc.grandTotal as Money;
+  let totalPaid = doc.fyo.pesa(0);
 
   for (const payment of paymentIds) {
     const paymentDoc = await doc.fyo.doc.getDoc(ModelNameEnum.Payment, payment);
-    outstandingAmount = outstandingAmount.sub(paymentDoc.amount as Money);
+    const amount = paymentDoc.amount as Money;
+    outstandingAmount = outstandingAmount.sub(amount);
+    totalPaid = totalPaid.add(amount);
 
     paymentDetails.push({
       amount: doc.fyo.format(paymentDoc.amount, ModelNameEnum.Currency),
@@ -155,7 +346,10 @@ async function getPaymentDetails(doc: Doc, paymentId: string[]) {
     });
   }
 
-  return paymentDetails;
+  return {
+    paymentDetails,
+    totalPaid: totalPaid.float ? totalPaid : null,
+  };
 }
 
 function getDate(dateString: string): string {
@@ -341,9 +535,16 @@ function getPrintTemplateDocHints(
   schema: Schema,
   fyo: Fyo,
   fieldnames?: string[],
-  linkLevel?: number
+  linkLevel?: number,
+  visited?: Set<string>
 ): PrintTemplateHint {
   linkLevel ??= 0;
+  visited ??= new Set<string>();
+  if (visited.has(schema.name)) {
+    return {};
+  }
+  visited.add(schema.name);
+
   const hints: PrintTemplateHint = {};
   const links: PrintTemplateHint = {};
 
@@ -360,18 +561,21 @@ function getPrintTemplateDocHints(
 
     hints[fieldname] = label ?? fieldname;
     const { target } = field as TargetField;
-    const targetSchema = fyo.schemaMap[target];
+    const targetSchema = target ? fyo.schemaMap[target] : undefined;
     if (fieldtype === FieldTypeEnum.Link && targetSchema && linkLevel < 2) {
       links[fieldname] = getPrintTemplateDocHints(
         targetSchema,
         fyo,
         undefined,
-        linkLevel + 1
+        linkLevel + 1,
+        visited
       );
     }
 
     if (fieldtype === FieldTypeEnum.Table && targetSchema) {
-      hints[fieldname] = [getPrintTemplateDocHints(targetSchema, fyo)];
+      hints[fieldname] = [
+        getPrintTemplateDocHints(targetSchema, fyo, undefined, linkLevel + 1, visited),
+      ];
     }
   }
 
@@ -385,7 +589,20 @@ function getPrintTemplateDocHints(
   return hints;
 }
 
-async function getPrintTemplateDocValues(doc: Doc, fieldnames?: string[]) {
+async function getPrintTemplateDocValues(
+  doc: Doc,
+  fieldnames?: string[],
+  options?: {
+    linkLevel?: number;
+    maxLinkLevel?: number;
+    includeLinks?: boolean;
+    visited?: Set<string>;
+  }
+) {
+  const linkLevel = options?.linkLevel ?? 0;
+  const maxLinkLevel = options?.maxLinkLevel ?? 2;
+  const includeLinks = options?.includeLinks ?? true;
+  const visited = options?.visited ?? new Set<string>();
   const values: PrintTemplateData = {};
   if (!(doc instanceof Doc)) {
     return values;
@@ -417,7 +634,12 @@ async function getPrintTemplateDocValues(doc: Doc, fieldnames?: string[]) {
 
     const table: PrintTemplateData[] = [];
     for (const row of value) {
-      const rowProps = await getPrintTemplateDocValues(row);
+      const rowProps = await getPrintTemplateDocValues(row, undefined, {
+        linkLevel,
+        maxLinkLevel,
+        includeLinks: false,
+        visited,
+      });
       table.push(rowProps);
     }
 
@@ -429,6 +651,16 @@ async function getPrintTemplateDocValues(doc: Doc, fieldnames?: string[]) {
   values.entryLabel = doc.schema.label;
 
   // Set Formatted Doc Link Data
+  if (!includeLinks || linkLevel >= maxLinkLevel) {
+    return values;
+  }
+
+  const docId = `${doc.schemaName}::${doc.name ?? ''}`;
+  if (visited.has(docId)) {
+    return values;
+  }
+  visited.add(docId);
+
   await doc.loadLinks();
   const links: PrintTemplateData = {};
   for (const [linkName, linkDoc] of Object.entries(doc.links ?? {})) {
@@ -436,7 +668,12 @@ async function getPrintTemplateDocValues(doc: Doc, fieldnames?: string[]) {
       continue;
     }
 
-    links[linkName] = await getPrintTemplateDocValues(linkDoc);
+    links[linkName] = await getPrintTemplateDocValues(linkDoc, undefined, {
+      linkLevel: linkLevel + 1,
+      maxLinkLevel,
+      includeLinks: true,
+      visited,
+    });
   }
 
   if (Object.keys(links).length) {
@@ -476,6 +713,55 @@ export async function getPathAndMakePDF(
   }
 }
 
+function getPrintTemplateStyles(): string {
+  return `
+    .invoice-print { font-family: Cairo, Tahoma, Arial, sans-serif; }
+    .invoice-print .invoice-header { padding: 0.5rem 0 0.75rem; }
+    .invoice-print .invoice-header .logo-img,
+    .invoice-print .logo-img { max-height: 56px; max-width: 140px; object-fit: contain; }
+    .invoice-print .invoice-meta-grid { display: grid; gap: 0.25rem 0.5rem; }
+    .invoice-print .invoice-table { border-collapse: collapse; width: 100%; table-layout: fixed; }
+    .invoice-print .invoice-table th,
+    .invoice-print .invoice-table td { border: 1px solid #e2e8f0; padding: 0.4rem 0.5rem; }
+    .invoice-print .invoice-table th { background: #f1f5f9; font-weight: 600; }
+    .invoice-print .invoice-table .col-item { width: 28%; }
+    .invoice-print .invoice-table .col-qty { width: 10%; text-align: center; }
+    .invoice-print .invoice-table .col-rate { width: 14%; text-align: right; }
+    .invoice-print .invoice-table .col-amount { width: 14%; text-align: right; }
+    .invoice-print .invoice-table .num { font-variant-numeric: tabular-nums; }
+    .invoice-print .totals-table { width: 100%; max-width: 320px; margin-right: auto; margin-left: 0; border-collapse: collapse; }
+    .invoice-print .totals-table td { padding: 0.35rem 0.5rem; border-bottom: 1px solid #e2e8f0; }
+    .invoice-print .totals-table .grand-row td { font-size: 1.1rem; font-weight: 700; border-bottom: none; padding-top: 0.5rem; }
+    .invoice-print .totals-box { border: 1px solid #e2e8f0; background: #f8fafc; padding: 0.75rem 1rem; max-width: 300px; margin-right: auto; }
+    .invoice-print .meta-grid { display: grid; grid-template-columns: auto 1fr; gap: 0.25rem 0.75rem; }
+    .invoice-print .totals-table .grand-row td { font-weight: 700; font-size: 1.05rem; }
+    .thermal-receipt { font-family: Cairo, Tahoma, Arial, sans-serif; font-size: 11px; line-height: 1.3; }
+    .thermal-receipt .logo-img { max-height: 36px; max-width: 100%; object-fit: contain; }
+    .thermal-receipt .receipt-table { border-collapse: collapse; width: 100%; font-size: 10px; }
+    .thermal-receipt .receipt-table th,
+    .thermal-receipt .receipt-table td { border: none; border-bottom: 1px dotted #ccc; padding: 2px 3px; vertical-align: top; }
+    .thermal-receipt .receipt-table th { background: #f0f0f0; font-weight: 600; }
+    .thermal-receipt .receipt-table .col-item { width: 38%; max-width: 38%; word-wrap: break-word; }
+    .thermal-receipt .receipt-table .col-num { text-align: right; width: 18%; font-variant-numeric: tabular-nums; }
+    .thermal-receipt .receipt-table .item-name { word-break: break-word; line-height: 1.25; }
+    @media print {
+      html, body {
+        margin: 0 !important;
+        padding: 0 !important;
+        background: white;
+        -webkit-print-color-adjust: exact;
+        print-color-adjust: exact;
+      }
+      @page { margin: 8mm; size: auto; }
+      * { box-sizing: border-box; }
+      .invoice-print .invoice-table tr,
+      .invoice-print .item-row { break-inside: avoid; }
+      .thermal-receipt { width: 72mm !important; max-width: 80mm !important; margin: 0; padding: 2mm; }
+      .thermal-receipt .receipt-table tr { break-inside: avoid; }
+    }
+  `;
+}
+
 function constructPrintDocument(innerHTML: string) {
   const html = document.createElement('html');
   const head = document.createElement('head');
@@ -483,25 +769,7 @@ function constructPrintDocument(innerHTML: string) {
   const style = getAllCSSAsStyleElem();
 
   const printCSS = document.createElement('style');
-  printCSS.innerHTML = `
-    @media print {
-      html, body {
-        margin: 0 !important;
-        padding: 0 !important;
-        background: white;
-      }
-
-      @page {
-        margin: 0;
-      }
-
-      * {
-        box-sizing: border-box;
-        margin: 0;
-        padding: 0;
-      }
-    }
-  `;
+  printCSS.innerHTML = getPrintTemplateStyles();
 
   head.innerHTML = [
     '<meta charset="UTF-8">',
@@ -517,14 +785,24 @@ function constructPrintDocument(innerHTML: string) {
 
 function getAllCSSAsStyleElem() {
   const cssTexts: string[] = [];
-  for (const sheet of document.styleSheets) {
-    for (const rule of sheet.cssRules) {
-      cssTexts.push(rule.cssText);
+  try {
+    for (const sheet of document.styleSheets) {
+      try {
+        if (sheet.cssRules) {
+          for (const rule of sheet.cssRules) {
+            cssTexts.push(rule.cssText);
+          }
+        }
+        if (sheet.ownerRule) {
+          cssTexts.push(sheet.ownerRule.cssText);
+        }
+      } catch {
+        // Cross-origin or restricted stylesheet (e.g. in production build);
+        // skip this sheet so print still works with inline/print CSS.
+      }
     }
-
-    if (sheet.ownerRule) {
-      cssTexts.push(sheet.ownerRule.cssText);
-    }
+  } catch {
+    // Fallback if styleSheets iteration fails
   }
 
   const styleElem = document.createElement('style');

@@ -12,7 +12,11 @@
         dropdownVisible ? 'dark:hover:bg-gray-850' : '',
       ]"
     >
-      <div class="w-full" @click="toggleDropdown">
+      <div
+        class="w-full"
+        @mousedown="onTriggerMouseDown"
+        @click="toggleDropdown"
+      >
         <div
           class="
             flex
@@ -29,14 +33,14 @@
           }"
         >
           <span
-            v-if="selectValue || value"
+            v-if="displayLabel || value"
             class="cursor-text text-black dark:text-white w-full"
-            >{{ selectValue ? selectValue : value }}</span
+            >{{ displayLabel || value }}</span
           >
           <span v-else>{{ inputPlaceholder }}</span>
           <svg
             v-if="!isReadOnly"
-            class="w-3 h-3"
+            class="w-4 h-4 flex-shrink-0"
             style="background: inherit; margin-right: -3px"
             viewBox="0 0 5 10"
             xmlns="http://www.w3.org/2000/svg"
@@ -91,10 +95,10 @@
                 dark:hover:bg-gray-875
                 flex
               "
-              :class="selectValue !== option.label ? 'pl-6' : 'pl-2'"
+              :class="currentValue !== option.value ? 'pl-6' : 'pl-2'"
             >
               <svg
-                v-if="selectValue === option.label"
+                v-if="currentValue === option.value"
                 xmlns="http://www.w3.org/2000/svg"
                 x="0px"
                 y="0px"
@@ -129,7 +133,6 @@ export default defineComponent({
   data() {
     return {
       dropdownVisible: false,
-      selectValue: this.value,
     };
   },
   props: {
@@ -144,10 +147,28 @@ export default defineComponent({
         return [];
       }
 
-      return this.df.options;
+      const raw = (this.df as { options?: (string | SelectOption)[] }).options;
+      if (!raw?.length) return [];
+
+      return raw.map((o) =>
+        typeof o === 'string' ? { value: o, label: o } : o
+      ) as SelectOption[];
+    },
+    currentValue(): string | number | boolean | undefined {
+      return this.value as string | number | boolean | undefined;
+    },
+    displayLabel(): string {
+      if (this.currentValue == null || this.currentValue === '') return '';
+      const opt = this.options.find((o) => o.value === this.currentValue);
+      return opt?.label ?? String(this.currentValue);
     },
   },
   methods: {
+    onTriggerMouseDown(e: MouseEvent) {
+      if (!this.isReadOnly) {
+        e.preventDefault();
+      }
+    },
     toggleDropdown() {
       if (!this.closeDropDown) {
         this.dropdownVisible = true;
@@ -156,7 +177,6 @@ export default defineComponent({
       }
     },
     selectOption(option: SelectOption) {
-      this.selectValue = option.label;
       this.triggerChange(option.value);
 
       if (this.closeDropDown) {

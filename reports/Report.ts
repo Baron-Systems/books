@@ -5,7 +5,7 @@ import { Action } from 'fyo/model/types';
 import Observable from 'fyo/utils/observable';
 import { Field, RawValue } from 'schemas/types';
 import { getIsNullOrUndef } from 'utils';
-import { ColumnField, ReportData } from './types';
+import { ColumnField, ReportData, ReportRow } from './types';
 
 export abstract class Report extends Observable<RawValue> {
   static title: string;
@@ -16,6 +16,7 @@ export abstract class Report extends Observable<RawValue> {
   columns: ColumnField[] = [];
   filters: Field[] = [];
   reportData: ReportData;
+  totalsRow: ReportRow | null = null;
   usePagination = false;
   shouldRefresh = false;
   abstract loading: boolean;

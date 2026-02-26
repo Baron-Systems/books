@@ -31,7 +31,7 @@
 
   <div
     class="overflow-y-auto custom-scroll custom-scroll-thumb2"
-    style="height: 70vh"
+    style="height: 100%"
   >
     <Row
       v-if="items"
@@ -59,7 +59,7 @@
         size="large"
         class=""
         :df="df"
-        :value="row[df.fieldname]"
+        :value="row[df.fieldname as keyof POSItem]"
         :readOnly="true"
       />
     </Row>
@@ -70,6 +70,7 @@
 import FormControl from 'src/components/Controls/FormControl.vue';
 import Row from 'src/components/Row.vue';
 import { isNumeric } from 'src/utils';
+import { t } from 'fyo';
 import { defineComponent } from 'vue';
 import { Field } from 'schemas/types';
 import { POSItem } from '../types';
@@ -91,28 +92,28 @@ export default defineComponent({
         {
           fieldname: 'name',
           fieldtype: 'Data',
-          label: 'Item',
-          placeholder: 'Item',
+          label: t`Item`,
+          placeholder: t`Item`,
           readOnly: true,
         },
         {
           fieldname: 'rate',
-          label: 'Rate',
-          placeholder: 'Rate',
+          label: t`Rate`,
+          placeholder: t`Rate`,
           fieldtype: 'Currency',
           readOnly: true,
         },
         {
           fieldname: 'availableQty',
-          label: 'Qty',
-          placeholder: 'Available Qty',
+          label: t`Qty`,
+          placeholder: t`Available Qty`,
           fieldtype: 'Float',
           readOnly: true,
         },
         {
           fieldname: 'unit',
-          label: 'Unit',
-          placeholder: 'Unit',
+          label: t`Unit`,
+          placeholder: t`Unit`,
           fieldtype: 'Data',
           target: 'UOM',
           readOnly: true,

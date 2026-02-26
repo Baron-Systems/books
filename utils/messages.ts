@@ -42,6 +42,9 @@ export enum IPC_ACTIONS {
   DB_CALL = 'db-call',
   DB_BESPOKE = 'db-bespoke',
   DB_SCHEMA = 'db-schema',
+  // Auth (bcrypt runs in main to avoid crypto in renderer)
+  AUTH_HASH_PASSWORD = 'auth-hash-password',
+  AUTH_VERIFY_PASSWORD = 'auth-verify-password',
 }
 
 // ipcMain.send(...)

@@ -39,7 +39,7 @@ export async function connectToDatabase(
 export async function handleDatabaseConnectionError(
   error: Error,
   dbPath: string
-) {
+): Promise<(typeof dbErrorActionSymbols)[keyof typeof dbErrorActionSymbols]> {
   const message = error.message;
   if (typeof message !== 'string') {
     throw error;
@@ -68,9 +68,11 @@ async function handleDirectoryDoesNotExist(dbPath: string) {
   );
 }
 
-async function showDbErrorDialog(detail: string) {
+async function showDbErrorDialog(
+  detail: string
+): Promise<(typeof dbErrorActionSymbols)[keyof typeof dbErrorActionSymbols]> {
   const { showDialog } = await import('src/utils/interactive');
-  return showDialog({
+  return (await showDialog({
     type: 'error',
     title: t`Cannot Open File`,
     detail,
@@ -90,5 +92,5 @@ async function showDbErrorDialog(detail: string) {
         isEscape: true,
       },
     ],
-  });
+  })) as (typeof dbErrorActionSymbols)[keyof typeof dbErrorActionSymbols];
 }

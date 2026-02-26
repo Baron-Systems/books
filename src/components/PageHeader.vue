@@ -6,15 +6,24 @@
       justify-between
       items-center
       h-row-largest
+      box-border
       flex-shrink-0
-      surface-bg
+      theme-tinted-bg
+      header-elevated
+      rounded-xl
+      mt-4
+      mx-4
     "
     :class="[
-      border ? 'border-b dark:border-gray-800' : '',
+      border
+        ? showSidebar
+          ? 'border border-white border-s-0'
+          : 'border border-white'
+        : '',
       platform !== 'Windows' ? 'window-drag' : '',
     ]"
   >
-    <Transition name="spacer" class="border-none">
+    <Transition name="spacer">
       <div
         v-if="!showSidebar && platform === 'Mac' && languageDirection !== 'rtl'"
         class="h-full"
@@ -22,36 +31,37 @@
       />
     </Transition>
 
-    <div
-      class="flex items-center window-no-drag gap-4 me-auto"
-      :class="platform === 'Mac' && languageDirection === 'rtl' ? 'me-18' : ''"
-    >
-      <!-- Nav Group -->
-      <PageHeaderNavGroup />
+    <!-- Left: title + left slot -->
+    <div class="flex items-center window-no-drag gap-3 min-w-0">
       <h1
         v-if="title"
         class="
           text-xl
-          font-semibold
+          font-extrabold
+          tracking-tight
           select-none
           whitespace-nowrap
-          dark:text-white
+          text-gray-900
+          dark:text-gray-25
+          truncate
         "
       >
         {{ title }}
       </h1>
 
-      <!-- Left Slot -->
-      <div class="flex items-stretch window-no-drag gap-4">
+      <div class="flex items-stretch window-no-drag gap-2">
         <slot name="left" />
       </div>
     </div>
 
-    <!-- Right (regular) Slot -->
-    <div
-      class="flex items-stretch window-no-drag gap-2 ms-auto"
-      :class="platform === 'Mac' && languageDirection === 'rtl' ? 'me-18' : ''"
-    >
+    <!-- Center: search -->
+    <div class="flex-1 flex justify-center window-no-drag px-3">
+      <SearchBar />
+    </div>
+
+    <!-- Right: nav + right slot -->
+    <div class="flex items-center window-no-drag gap-3">
+      <PageHeaderNavGroup />
       <slot />
     </div>
   </div>
@@ -61,9 +71,10 @@ import { languageDirectionKey } from 'src/utils/injectionKeys';
 import { showSidebar } from 'src/utils/refs';
 import { defineComponent, inject, Transition } from 'vue';
 import PageHeaderNavGroup from './PageHeaderNavGroup.vue';
+import SearchBar from './SearchBar.vue';
 
 export default defineComponent({
-  components: { Transition, PageHeaderNavGroup },
+  components: { Transition, PageHeaderNavGroup, SearchBar },
   props: {
     title: { type: String, default: '' },
     border: { type: Boolean, default: true },

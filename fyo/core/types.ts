@@ -34,8 +34,12 @@ export type AuthDemuxConstructor = new (isElectron?: boolean) => AuthDemuxBase;
 export type ConfigMap = {
   files: ConfigFile[];
   lastSelectedFilePath: null | string;
-  language: string 
-  deviceId: string
+  language: string;
+  deviceId: string;
+  /** ISO string or null */
+  'license.expiresAt': string | null;
+  /** ISO string or null */
+  'license.lastSeenAt': string | null;
 };
 
 export interface ConfigFile {

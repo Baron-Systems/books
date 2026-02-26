@@ -5,8 +5,11 @@ import { AccountingSettings } from './baseModels/AccountingSettings/AccountingSe
 import { Address } from './baseModels/Address/Address';
 import { Defaults } from './baseModels/Defaults/Defaults';
 import { Item } from './baseModels/Item/Item';
+import { ItemPriceListItem } from './baseModels/Item/ItemPriceListItem';
 import { JournalEntry } from './baseModels/JournalEntry/JournalEntry';
 import { JournalEntryAccount } from './baseModels/JournalEntryAccount/JournalEntryAccount';
+import { JournalEntryTemplate } from './baseModels/JournalEntryTemplate/JournalEntryTemplate';
+import { JournalEntryTemplateLine } from './baseModels/JournalEntryTemplateLine/JournalEntryTemplateLine';
 import { Misc } from './baseModels/Misc';
 import { Party } from './baseModels/Party/Party';
 import { LoyaltyProgram } from './baseModels/LoyaltyProgram/LoyaltyProgram';
@@ -58,6 +61,7 @@ import { ERPNextSyncQueue } from './baseModels/ERPNextSyncQueue/ERPNextSyncQueue
 import { FetchFromERPNextQueue } from './baseModels/FetchFromERPNextQueue/FetchFromERPNextQueue';
 import { IntegrationErrorLog } from './baseModels/IntegrationErrorLog/IntegrationErrorLog';
 import { ItemEnquiry } from './baseModels/ItemEnquiry/ItemEnquiry';
+import { User } from './baseModels/User/User';
 
 export const models = {
   Account,
@@ -67,10 +71,13 @@ export const models = {
   Batch,
   Defaults,
   Item,
+  ItemPriceListItem,
   ItemGroup,
   ItemEnquiry,
   JournalEntry,
   JournalEntryAccount,
+  JournalEntryTemplate,
+  JournalEntryTemplateLine,
   Misc,
   Lead,
   Party,
@@ -123,6 +130,8 @@ export const models = {
   FetchFromERPNextQueue,
   // Error Log
   IntegrationErrorLog,
+  // Users
+  User,
 } as ModelMap;
 
 export async function getRegionalModels(

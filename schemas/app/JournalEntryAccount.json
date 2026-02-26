@@ -9,8 +9,16 @@
       "placeholder": "Account",
       "fieldtype": "Link",
       "target": "Account",
-      "required": true,
+      "required": false,
       "groupBy": "rootType"
+    },
+    {
+      "fieldname": "party",
+      "label": "Party",
+      "placeholder": "Party",
+      "fieldtype": "Link",
+      "target": "Party",
+      "description": "Required for Receivable and Payable accounts"
     },
     {
       "fieldname": "debit",
@@ -21,8 +29,29 @@
       "fieldname": "credit",
       "label": "Credit",
       "fieldtype": "Currency"
+    },
+    {
+      "fieldname": "allowEditDebit",
+      "label": "Allow Edit Debit",
+      "fieldtype": "Check",
+      "default": true,
+      "hidden": true
+    },
+    {
+      "fieldname": "allowEditCredit",
+      "label": "Allow Edit Credit",
+      "fieldtype": "Check",
+      "default": true,
+      "hidden": true
+    },
+    {
+      "fieldname": "allowEditAccount",
+      "label": "Allow Edit Account",
+      "fieldtype": "Check",
+      "default": true,
+      "hidden": true
     }
   ],
-  "tableFields": ["account", "debit", "credit"],
+  "tableFields": ["account", "party", "debit", "credit"],
   "keywordFields": ["account"]
 }

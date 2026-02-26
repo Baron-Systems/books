@@ -189,10 +189,14 @@ export default defineComponent({
         return;
       }
 
+      const action = d.action;
       if (this.doc) {
-        await d.action(this.doc, this.$router);
+        await (action as (doc: Doc, router: unknown) => unknown)(
+          this.doc,
+          this.$router
+        );
       } else {
-        await d.action();
+        await (action as () => unknown)();
       }
 
       this.toggleDropdown(false);

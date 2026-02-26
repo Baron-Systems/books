@@ -54,6 +54,7 @@
 
     <PaymentModal
       :open-modal="openPaymentModal"
+      :opened-for-pay="openPaymentModalForPay"
       @toggle-modal="emitEvent('toggleModal', 'Payment')"
       @set-paid-amount="(amount: Money) => emitEvent('setPaidAmount', amount)"
       @set-payment-method="
@@ -83,7 +84,7 @@
 
     <div
       class="bg-gray-25 dark:bg-gray-875 grid grid-cols-12 gap-2 p-4"
-      style="height: calc(100vh - var(--h-row-largest))"
+      style="height: calc(100vh - var(--h-row-largest) - 5.5rem)"
     >
       <div
         class="
@@ -94,12 +95,12 @@
           dark:border-gray-800 dark:bg-gray-850
         "
       >
-        <div class="rounded-md p-4 col-span-5">
+        <div class="rounded-md p-4 col-span-5 flex flex-col h-full">
           <div class="flex gap-x-2">
             <!-- Item Search -->
             <MultiLabelLink
               class="w-full"
-              secondary-link="barcode"
+              secondary-link="itemCode"
               third-link="itemCode"
               :df="{
                 label: t`Search Item (Name or
@@ -130,21 +131,26 @@
             />
           </div>
 
-          <ItemsTable
-            v-if="tableView"
-            :items="items"
-            :item-qty-map="itemQuantityMap as ItemQtyMap"
-            @add-item="(item) => emitEvent('addItem', item)"
-          />
+          <div class="mt-3 flex-1 min-h-0">
+            <ItemsTable
+              v-if="tableView"
+              :items="items"
+              :item-qty-map="itemQuantityMap as ItemQtyMap"
+              @add-item="(item) => emitEvent('addItem', item)"
+            />
 
-          <ItemsGrid
-            v-else
-            :items="items"
-            :item-qty-map="itemQuantityMap as ItemQtyMap"
-            @add-item="(item) => emitEvent('addItem', item)"
-          />
+            <ItemsGrid
+              v-else
+              :items="items"
+              :item-qty-map="itemQuantityMap as ItemQtyMap"
+              @add-item="(item) => emitEvent('addItem', item)"
+            />
+          </div>
 
-          <div class="flex fixed bottom-0 p-1 mb-7 gap-x-3">
+          <!-- Quick actions pinned to bottom of item selector column -->
+          <div
+            class="flex mt-4 pt-2 gap-x-3 border-t border-gray-200 dark:border-gray-700 mt-auto"
+          >
             <POSQuickActions
               :sinv-doc="sinvDoc"
               :loyalty-points="loyaltyPoints"
@@ -158,8 +164,10 @@
         </div>
       </div>
 
-      <div class="col-span-7">
-        <div class="flex flex-col gap-3" style="height: calc(100vh - 6rem)">
+      <div class="col-span-7 flex flex-col min-h-0">
+        <div
+          class="flex flex-col gap-3 overflow-y-auto flex-1 min-h-0"
+        >
           <div
             class="
               p-4
@@ -169,6 +177,8 @@
               grow
               h-full
               dark:border-gray-800 dark:bg-gray-850
+              flex
+              flex-col
             "
           >
             <!-- Customer Search -->
@@ -183,184 +193,168 @@
               @change="(value:string) => $emit('setCustomer',value)"
             />
 
-            <SelectedItemTable
-              @apply-pricing-rule="emitEvent('applyPricingRule')"
-              @selected-row="(row) => $emit('selectedRow', row)"
-            />
+            <div class="mt-3 flex-1 min-h-0">
+              <SelectedItemTable
+                @apply-pricing-rule="emitEvent('applyPricingRule')"
+                @selected-row="(row) => $emit('selectedRow', row)"
+              />
+            </div>
           </div>
 
           <div
             class="
-              p-3
+              p-4
               bg-white
               border
-              rounded-md
+              rounded-lg
               dark:border-gray-800 dark:bg-gray-850
             "
+            style="position: sticky; bottom: 0; z-index: 10"
           >
-            <div class="w-full grid grid-cols-2 gap-y-2 gap-x-3">
-              <div class="flex flex-col justify-end">
-                <div class="grid grid-cols-2 gap-2">
-                  <FloatingLabelFloatInput
-                    :df="{
-                      label: t`Total Quantity`,
-                      fieldtype: 'Int',
-                      fieldname: 'totalQuantity',
-                      minvalue: 0,
-                      maxvalue: 1000,
-                    }"
-                    size="large"
-                    :value="totalQuantity"
-                    :read-only="true"
-                    :text-right="true"
-                  />
-
-                  <FloatingLabelCurrencyInput
-                    :df="{
-                      label: t`Add'l Discounts`,
-                      fieldtype: 'Int',
-                      fieldname: 'additionalDiscount',
-                      minvalue: 0,
-                    }"
-                    size="large"
-                    :value="additionalDiscounts"
-                    :read-only="true"
-                    :text-right="true"
-                    @change="(amount:Money)=> additionalDiscounts= amount"
-                  />
-                </div>
-
-                <div class="mt-4 grid grid-cols-2 gap-2">
-                  <FloatingLabelCurrencyInput
-                    :df="{
-                      label: t`Item Discounts`,
-                      fieldtype: 'Currency',
-                      fieldname: 'itemDiscounts',
-                    }"
-                    size="large"
-                    :value="itemDiscounts"
-                    :read-only="true"
-                    :text-right="true"
-                  />
-
-                  <FloatingLabelCurrencyInput
-                    v-if="sinvDoc?.fieldMap"
-                    :df="sinvDoc?.fieldMap.grandTotal"
-                    size="large"
-                    :value="sinvDoc?.grandTotal"
-                    :read-only="true"
-                    :text-right="true"
-                  />
-                </div>
+            <!-- Summary: ترتيب أوضح — الكمية، الخصومات، ثم المجموع الكلي بارز -->
+            <div class="grid grid-cols-2 gap-x-4 gap-y-3">
+              <FloatingLabelFloatInput
+                :df="{
+                  label: t`Total Quantity`,
+                  fieldtype: 'Int',
+                  fieldname: 'totalQuantity',
+                  minvalue: 0,
+                  maxvalue: 1000,
+                }"
+                size="large"
+                :value="totalQuantity"
+                :read-only="true"
+                :text-right="true"
+              />
+              <FloatingLabelCurrencyInput
+                :df="{
+                  label: t`Item Discounts`,
+                  fieldtype: 'Currency',
+                  fieldname: 'itemDiscounts',
+                }"
+                size="large"
+                :value="itemDiscounts"
+                :read-only="true"
+                :text-right="true"
+              />
+              <FloatingLabelCurrencyInput
+                :df="{
+                  label: t`Add'l Discounts`,
+                  fieldtype: 'Int',
+                  fieldname: 'additionalDiscount',
+                  minvalue: 0,
+                }"
+                size="large"
+                :value="additionalDiscounts"
+                :read-only="true"
+                :text-right="true"
+                @change="(amount:Money)=> additionalDiscounts= amount"
+              />
+              <!-- المجموع الكلي مع تمييز بصري -->
+              <div
+                v-if="sinvDoc?.fieldMap"
+                class="rounded-lg border-2 border-blue-200 dark:border-blue-700 bg-blue-50/60 dark:bg-blue-900/25 px-2"
+              >
+                <FloatingLabelCurrencyInput
+                  :df="sinvDoc?.fieldMap.grandTotal"
+                  size="large"
+                  :value="sinvDoc?.grandTotal"
+                  :read-only="true"
+                  :text-right="true"
+                  class="grand-total-input"
+                />
               </div>
-              <div class="w-full">
-                <div class="w-full flex gap-2">
-                  <Button
-                    class="w-full"
-                    :style="{
-                      backgroundColor:
-                        profile?.saveButtonColour ||
-                        fyo.singles.Defaults?.saveButtonColour,
-                    }"
-                    :class="`${isReturnInvoiceEnabledReturn ? 'py-5' : 'py-6'}`"
-                    @click="$emit('saveInvoiceAction')"
-                  >
-                    <slot>
-                      <p class="uppercase text-lg text-white font-semibold">
-                        {{ t`Save` }}
-                      </p>
-                    </slot>
-                  </Button>
-                  <Button
-                    class="w-full"
-                    :style="{
-                      backgroundColor:
-                        profile?.cancelButtonColour ||
-                        fyo.singles.Defaults?.cancelButtonColour,
-                    }"
-                    :class="`${isReturnInvoiceEnabledReturn ? 'py-5' : 'py-6'}`"
-                    @click="() => $emit('clearValues')"
-                  >
-                    <slot>
-                      <p class="uppercase text-lg text-white font-semibold">
-                        {{ t`Cancel` }}
-                      </p>
-                    </slot>
-                  </Button>
-                </div>
-                <div
-                  class="w-full flex gap-2"
-                  :class="`${isReturnInvoiceEnabledReturn ? 'mt-2' : 'mt-4'}`"
-                >
-                  <Button
-                    class="w-full"
-                    :style="{
-                      backgroundColor:
-                        profile?.heldButtonColour ||
-                        fyo.singles.Defaults?.heldButtonColour,
-                    }"
-                    :class="`${isReturnInvoiceEnabledReturn ? 'py-5' : 'py-6'}`"
-                    @click="emitEvent('toggleModal', 'SavedInvoice', true)"
-                  >
-                    <slot>
-                      <p class="uppercase text-lg text-white font-semibold">
-                        {{ t`held` }}
-                      </p>
-                    </slot>
-                  </Button>
+            </div>
 
+            <div
+              class="mt-4 pt-4 border-t border-gray-200 dark:border-gray-700"
+              role="group"
+              :aria-label="t`Actions`"
+            >
+              <div class="grid grid-cols-2 gap-2">
+                <Button
+                  type="primary"
+                  class="w-full py-4"
+                  :disabled="!canWriteSales"
+                  @click="$emit('saveInvoiceAction')"
+                >
+                  <span class="uppercase text-base font-semibold text-white">
+                    {{ t`Save` }}
+                  </span>
+                </Button>
+                <Button
+                  type="secondary"
+                  class="w-full py-4"
+                  @click="() => $emit('clearValues')"
+                >
+                  <span class="uppercase text-base font-semibold">
+                    {{ t`Cancel` }}
+                  </span>
+                </Button>
+                <Button
+                  type="primary"
+                  class="w-full py-4"
+                  @click="emitEvent('toggleModal', 'SavedInvoice', true)"
+                >
+                  <span class="uppercase text-base font-semibold text-white">
+                    {{ t`Held` }}
+                  </span>
+                </Button>
+                <template v-if="isReturnInvoiceEnabledReturn">
                   <Button
-                    v-if="isReturnInvoiceEnabledReturn"
-                    class="w-full py-5"
-                    :style="{
-                      backgroundColor:
-                        profile?.returnButtonColour ||
-                        fyo.singles.Defaults?.returnButtonColour,
-                    }"
+                    type="primary"
+                    class="w-full py-4"
                     @click="
                       emitEvent('toggleModal', 'ReturnSalesInvoice', true)
                     "
                   >
-                    <slot>
-                      <p class="uppercase text-lg text-white font-semibold">
-                        {{ t`Return` }}
-                      </p>
-                    </slot>
+                    <span class="uppercase text-base font-semibold text-white">
+                      {{ t`Return` }}
+                    </span>
                   </Button>
                   <Button
-                    v-else
-                    class="w-full"
-                    :style="{
-                      backgroundColor:
-                        profile?.payButton ||
-                        fyo.singles.Defaults?.payButtonColour,
-                    }"
-                    :class="`${isReturnInvoiceEnabledReturn ? 'py-5' : 'py-6'}`"
+                    type="primary"
+                    class="w-full py-5 text-lg"
+                    :disabled="disablePayButton"
+                    @click="emitEvent('registerOnly')"
+                  >
+                    <span class="uppercase font-bold text-white">
+                      {{ t`Register` }}
+                    </span>
+                  </Button>
+                  <Button
+                    type="primary"
+                    class="w-full py-5 text-lg"
+                    :disabled="disablePayButton"
                     @click="emitEvent('handlePaymentAction')"
                   >
-                    <slot>
-                      <p class="uppercase text-lg text-white font-semibold">
-                        {{ t`Pay` }}
-                      </p>
-                    </slot>
-                  </Button>
-                </div>
-                <Button
-                  v-if="isReturnInvoiceEnabledReturn"
-                  class="w-full mt-2 py-5"
-                  :style="{
-                    backgroundColor:
-                      profile?.payButtonColour ||
-                      fyo.singles.Defaults?.payButtonColour,
-                  }"
-                  @click="emitEvent('handlePaymentAction')"
-                >
-                  <slot>
-                    <p class="uppercase text-lg text-white font-semibold">
+                    <span class="uppercase font-bold text-white">
                       {{ t`Pay` }}
-                    </p>
-                  </slot>
-                </Button>
+                    </span>
+                  </Button>
+                </template>
+                <template v-else>
+                  <Button
+                    type="primary"
+                    class="w-full py-5 text-lg"
+                    :disabled="disablePayButton"
+                    @click="emitEvent('registerOnly')"
+                  >
+                    <span class="uppercase font-bold text-white">
+                      {{ t`Register` }}
+                    </span>
+                  </Button>
+                  <Button
+                    type="primary"
+                    class="w-full py-5 text-lg"
+                    :disabled="disablePayButton"
+                    @click="emitEvent('handlePaymentAction')"
+                  >
+                    <span class="uppercase font-bold text-white">
+                      {{ t`Pay` }}
+                    </span>
+                  </Button>
+                </template>
               </div>
             </div>
           </div>
@@ -434,6 +428,7 @@ export default defineComponent({
     isPosShiftOpen: Boolean,
     disablePayButton: Boolean,
     openPaymentModal: Boolean,
+    openPaymentModalForPay: Boolean,
     openPriceListModal: Boolean,
     openItemEnquiryModal: Boolean,
     openCouponCodeModal: Boolean,
@@ -520,6 +515,7 @@ export default defineComponent({
     'setTransferClearanceDate',
     'saveAndContinue',
     'handlePaymentAction',
+    'registerOnly',
     'selectedRow',
     'batchSelected',
   ],
@@ -530,6 +526,16 @@ export default defineComponent({
     };
   },
   computed: {
+    canWriteSales(): boolean {
+      try {
+        // استخدام hasPermission مباشرة بدون رمي استثناء
+        const { hasPermission } = require('src/utils/authService') as typeof import('src/utils/authService');
+        const { PERMISSIONS } = require('src/utils/permissions') as typeof import('src/utils/permissions');
+        return hasPermission(PERMISSIONS.SALES_WRITE);
+      } catch {
+        return true;
+      }
+    },
     isReturnInvoiceEnabledReturn: () =>
       fyo.singles.AccountingSettings?.enableInvoiceReturns ?? undefined,
   },

@@ -3,13 +3,96 @@
     <SectionHeader>
       <template #title>{{ t`Profit and Loss` }}</template>
       <template #action>
-        <PeriodSelector
-          :value="period"
-          :options="periodOptions"
-          @change="(value) => (period = value)"
-        />
+        <div class="flex items-center gap-3">
+          <!-- Chart Legend -->
+          <div v-if="hasData" class="flex text-sm gap-4">
+            <div class="flex items-center gap-2">
+              <span
+                class="w-3 h-3 rounded-sm inline-block flex-shrink-0 bg-blue-500 dark:bg-blue-600"
+              />
+              <span class="text-gray-700 dark:text-gray-300">{{ t`Profit` }}</span>
+            </div>
+            <div class="flex items-center gap-2">
+              <span
+                class="w-3 h-3 rounded-sm inline-block flex-shrink-0 bg-pink-500 dark:bg-pink-600"
+              />
+              <span class="text-gray-700 dark:text-gray-300">{{ t`Loss` }}</span>
+            </div>
+          </div>
+          <PeriodSelector
+            :value="period"
+            :options="periodOptions"
+            @change="(value) => (period = value)"
+          />
+        </div>
       </template>
     </SectionHeader>
+
+    <!-- Summary cards -->
+    <div
+      v-if="hasData"
+      class="grid grid-cols-3 gap-3 mt-4"
+      style="min-height: 4.5rem"
+    >
+      <div
+        class="rounded-lg border dark:border-gray-700/80 p-3 flex flex-col justify-center bg-emerald-50 dark:bg-emerald-950/30 border-emerald-200 dark:border-emerald-800/50"
+      >
+        <span
+          class="text-xs font-medium uppercase tracking-wide text-emerald-700 dark:text-emerald-400"
+        >
+          {{ t`Income` }}
+        </span>
+        <span
+          class="text-lg font-semibold mt-0.5 text-emerald-800 dark:text-emerald-200 tabular-nums"
+        >
+          {{ formatCurrency(totalIncome) }}
+        </span>
+      </div>
+      <div
+        class="rounded-lg border dark:border-gray-700/80 p-3 flex flex-col justify-center bg-rose-50 dark:bg-rose-950/30 border-rose-200 dark:border-rose-800/50"
+      >
+        <span
+          class="text-xs font-medium uppercase tracking-wide text-rose-700 dark:text-rose-400"
+        >
+          {{ t`Expenses` }}
+        </span>
+        <span
+          class="text-lg font-semibold mt-0.5 text-rose-800 dark:text-rose-200 tabular-nums"
+        >
+          {{ formatCurrency(totalExpenses) }}
+        </span>
+      </div>
+      <div
+        class="rounded-lg border dark:border-gray-700/80 p-3 flex flex-col justify-center"
+        :class="
+          netProfit >= 0
+            ? 'bg-emerald-50 dark:bg-emerald-950/30 border-emerald-200 dark:border-emerald-800/50'
+            : 'bg-rose-50 dark:bg-rose-950/30 border-rose-200 dark:border-rose-800/50'
+        "
+      >
+        <span
+          class="text-xs font-medium uppercase tracking-wide"
+          :class="
+            netProfit >= 0
+              ? 'text-emerald-700 dark:text-emerald-400'
+              : 'text-rose-700 dark:text-rose-400'
+          "
+        >
+          {{ t`Net` }}
+        </span>
+        <span
+          class="text-lg font-semibold mt-0.5 tabular-nums"
+          :class="
+            netProfit >= 0
+              ? 'text-emerald-800 dark:text-emerald-200'
+              : 'text-rose-800 dark:text-rose-200'
+          "
+        >
+          {{ formatCurrency(netProfit) }}
+        </span>
+      </div>
+    </div>
+
     <BarChart
       v-if="hasData"
       class="mt-4"
@@ -63,8 +146,13 @@ export default defineComponent({
     data: [] as { yearmonth: string; balance: number }[],
     hasData: false,
     periodOptions: ['This Year', 'This Quarter', 'YTD'],
+    totalIncome: 0,
+    totalExpenses: 0,
   }),
   computed: {
+    netProfit(): number {
+      return this.totalIncome - this.totalExpenses;
+    },
     chartData() {
       const points = [this.data.map((d) => d.balance)];
       const colors = [
@@ -94,6 +182,9 @@ export default defineComponent({
     this.setData();
   },
   methods: {
+    formatCurrency(value: number) {
+      return fyo.format(value ?? 0, 'Currency');
+    },
     async setData() {
       const { fromDate, toDate, periodList } = getDatesAndPeriodList(
         this.period
@@ -108,6 +199,15 @@ export default defineComponent({
         data.expense,
         'yearmonth',
         'balance'
+      );
+
+      this.totalIncome = (data.income as { balance: number }[]).reduce(
+        (sum, row) => sum + (row.balance ?? 0),
+        0
+      );
+      this.totalExpenses = (data.expense as { balance: number }[]).reduce(
+        (sum, row) => sum + (row.balance ?? 0),
+        0
       );
 
       this.data = periodList.map((d) => {

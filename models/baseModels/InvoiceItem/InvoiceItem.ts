@@ -19,7 +19,11 @@ import { Item } from '../Item/Item';
 import { StockTransfer } from 'models/inventory/StockTransfer';
 import { isPesa } from 'fyo/utils';
 import { PricingRule } from '../PricingRule/PricingRule';
-import { getItemRateFromPriceList, getPricingRule } from 'models/helpers';
+import {
+  getItemCostRate,
+  getItemRateFromPriceList,
+  getPricingRule,
+} from 'models/helpers';
 import { SalesInvoice } from '../SalesInvoice/SalesInvoice';
 
 export abstract class InvoiceItem extends Doc {
@@ -45,6 +49,8 @@ export abstract class InvoiceItem extends Doc {
 
   setItemDiscountAmount?: boolean;
   itemDiscountAmount?: Money;
+  /** Optional: "Total" (default) or "PerUnit". Used for validation only; calculation unchanged. */
+  discountType?: 'Total' | 'PerUnit';
   itemDiscountPercent?: number;
   itemDiscountedTotal?: Money;
   itemTaxedTotal?: Money;
@@ -184,6 +190,8 @@ export abstract class InvoiceItem extends Doc {
         'party',
         'exchangeRate',
         'item',
+        'unit',
+        'transferUnit',
         'quantity',
         'itemTaxedTotal',
         'itemDiscountedTotal',
@@ -217,7 +225,8 @@ export abstract class InvoiceItem extends Doc {
           }
         );
 
-        if (conversionItems.length) {
+        // If no conversions are defined, the only valid transfer unit is the stock unit.
+        if (!conversionItems.length) {
           return this.unit;
         }
 
@@ -241,7 +250,7 @@ export abstract class InvoiceItem extends Doc {
 
         return this.transferQuantity;
       },
-      dependsOn: ['item', 'quantity', 'qty'],
+      dependsOn: ['item', 'quantity', 'qty', 'unit', 'transferUnit'],
     },
     qty: {
       formula: (fieldname) => {
@@ -253,7 +262,7 @@ export abstract class InvoiceItem extends Doc {
         }
         return this.transferQuantity;
       },
-      dependsOn: ['transferQuantity', 'quantity'],
+      dependsOn: ['transferQuantity', 'quantity', 'unit', 'transferUnit'],
     },
     quantity: {
       formula: async (fieldname) => {
@@ -554,32 +563,76 @@ export abstract class InvoiceItem extends Doc {
   };
 
   validations: ValidationMap = {
-    rate: (value: DocValue) => {
-      if ((value as Money).gte(0)) {
-        return;
+    rate: async (value: DocValue) => {
+      const rate = value as Money;
+      if (rate.lt(0)) {
+        throw new ValidationError(
+          this.fyo.t`Rate (${this.fyo.format(
+            value,
+            'Currency'
+          )}) cannot be less zero.`
+        );
       }
 
-      throw new ValidationError(
-        this.fyo.t`Rate (${this.fyo.format(
-          value,
-          'Currency'
-        )}) cannot be less zero.`
+      const preventSellBelowCost = Boolean(
+        this.fyo.singles.Defaults?.preventSellBelowCost
       );
+      if (
+        this.isSales &&
+        preventSellBelowCost &&
+        this.item &&
+        !this.isFreeItem
+      ) {
+        const costRate = await getItemCostRate(this.fyo, this.item);
+        if (costRate.gt(0) && rate.lt(costRate)) {
+          throw new ValidationError(
+            this.fyo.t`Selling below cost is not allowed. Rate (${this.fyo.format(
+              rate,
+              'Currency'
+            )}) cannot be less than cost (${this.fyo.format(
+              costRate,
+              'Currency'
+            )}).`
+          );
+        }
+      }
     },
     itemDiscountAmount: (value: DocValue) => {
-      if ((value as Money).lte(this.amount!)) {
+      if (!isPesa(value)) {
         return;
       }
-
-      throw new ValidationError(
-        this.fyo.t`Discount Amount (${this.fyo.format(
-          value,
-          'Currency'
-        )}) cannot be greated than Amount (${this.fyo.format(
-          this.amount!,
-          'Currency'
-        )}).`
-      );
+      const discount = value;
+      if (discount.isNegative()) {
+        throw new ValidationError(
+          this.fyo.t`Discount Amount cannot be negative.`
+        );
+      }
+      const amount = this.amount ?? this.fyo.pesa(0);
+      if (discount.gt(amount)) {
+        throw new ValidationError(
+          this.fyo.t`Discount Amount (${this.fyo.format(
+            value,
+            'Currency'
+          )}) cannot be greater than Amount (${this.fyo.format(
+            amount,
+            'Currency'
+          )}).`
+        );
+      }
+      if (this.discountType === 'PerUnit') {
+        const rate = this.rate ?? this.fyo.pesa(0);
+        if (!rate.isZero() && discount.gt(rate)) {
+          throw new ValidationError(
+            this.fyo.t`Discount Amount (${this.fyo.format(
+              value,
+              'Currency'
+            )}) cannot be greater than Rate (${this.fyo.format(
+              rate,
+              'Currency'
+            )}) when discount type is Per Unit.`
+          );
+        }
+      }
     },
     itemDiscountPercent: (value: DocValue) => {
       if ((value as number) < 100) {

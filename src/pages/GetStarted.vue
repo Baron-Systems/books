@@ -1,71 +1,72 @@
 <template>
-  <div class="flex flex-col overflow-y-hidden">
+  <div class="flex flex-col overflow-y-hidden h-full">
     <PageHeader :title="t`Set Up Your Workspace`" />
     <div
       class="
         flex-1
+        min-h-0
         overflow-y-auto overflow-x-hidden
         custom-scroll custom-scroll-thumb1
+        flex flex-col
+        relative
+        rounded-2xl overflow-hidden
+        mx-2 my-1
       "
+      :style="backgroundStyle"
     >
       <div
-        v-for="section in sections"
-        :key="section.label"
-        class="p-4 border-b dark:border-gray-800"
+        class="
+          absolute inset-0
+          bg-white/85 dark:bg-gray-950/85
+          pointer-events-none
+          rounded-2xl
+        "
+        aria-hidden="true"
+      />
+      <!-- الأزرار العلوية – لا يُغيّر مكانها ولا ستايلها -->
+      <div
+        class="
+          relative
+          w-full max-w-7xl mx-auto
+          px-6 pt-6 pb-4
+          flex-shrink-0
+        "
       >
-        <h2 class="font-medium dark:text-gray-25">{{ section.label }}</h2>
-        <div class="flex mt-4 gap-4">
-          <div
-            v-for="item in section.items"
-            :key="item.label"
-            class="w-full md:w-1/3 sm:w-1/2"
+        <div
+          class="get-started-actions flex flex-wrap justify-center gap-3"
+        >
+          <Button
+            v-for="item in allItems"
+            :key="item.key"
+            class="
+              justify-center gap-2 min-h-12 px-5 py-3
+              font-medium text-base
+              border dark:border-gray-700
+              hover:border-gray-400 dark:hover:border-gray-500
+              shadow-sm
+              whitespace-nowrap
+            "
+            :type="item.action ? 'primary' : 'secondary'"
+            @click="handleAction(item)"
           >
-            <div
-              class="
-                flex flex-col
-                justify-between
-                h-40
-                p-4
-                border
-                dark:border-gray-800 dark:text-gray-50
-                rounded-lg
-              "
-              @mouseenter="() => (activeCard = item.key)"
-              @mouseleave="() => (activeCard = null)"
-            >
-              <div>
-                <component
-                  :is="getIconComponent(item)"
-                  v-show="activeCard !== item.key && !isCompleted(item)"
-                  class="mb-4"
-                />
-                <Icon
-                  v-show="isCompleted(item)"
-                  name="green-check"
-                  size="24"
-                  class="w-5 h-5 mb-4"
-                />
-                <h3 class="font-medium">{{ item.label }}</h3>
-                <p class="mt-2 text-sm text-gray-800 dark:text-gray-400">
-                  {{ item.description }}
-                </p>
-              </div>
-              <div
-                v-show="activeCard === item.key"
-                class="flex mt-2 overflow-hidden"
-              >
-                <Button
-                  v-if="item.action"
-                  class="leading-tight text-base"
-                  type="primary"
-                  @click="handleAction(item)"
-                >
-                  {{ t`Set Up` }}
-                </Button>
-              </div>
-            </div>
-          </div>
+            <Icon :name="item.icon" size="18" class="shrink-0" />
+            <span>{{ item.label }}</span>
+          </Button>
         </div>
+      </div>
+
+      <!-- منطقة المحتوى: النوت بوك بكامل الطول بين الأزرار ونهاية المنطقة القابلة للتمرير -->
+      <div
+        class="
+          relative
+          flex-1
+          min-h-0
+          flex flex-col
+          w-full max-w-7xl mx-auto
+          px-6
+        "
+      >
+        <Notebook class="flex-1 min-h-0" />
       </div>
     </div>
   </div>
@@ -76,10 +77,11 @@ import { DocValue } from 'fyo/core/types';
 import Button from 'src/components/Button.vue';
 import Icon from 'src/components/Icon.vue';
 import PageHeader from 'src/components/PageHeader.vue';
+import Notebook from 'src/pages/GetStarted/Notebook.vue';
 import { fyo } from 'src/initFyo';
 import { getGetStartedConfig } from 'src/utils/getStartedConfig';
 import { GetStartedConfigItem } from 'src/utils/types';
-import { Component, defineComponent, h } from 'vue';
+import { defineComponent } from 'vue';
 
 type ListItem = GetStartedConfigItem['items'][number];
 
@@ -89,15 +91,23 @@ export default defineComponent({
     PageHeader,
     Button,
     Icon,
+    Notebook,
   },
   props: {
     darkMode: { type: Boolean, default: false },
   },
   data() {
     return {
-      activeCard: null as string | null,
       sections: getGetStartedConfig(),
     };
+  },
+  computed: {
+    backgroundStyle() {
+      return { backgroundImage: 'none' };
+    },
+    allItems(): ListItem[] {
+      return this.sections.flatMap((s) => s.items);
+    },
   },
   async activated() {
     await fyo.doc.getDoc('GetStarted');
@@ -107,7 +117,6 @@ export default defineComponent({
     async handleAction({ key, action }: ListItem) {
       if (action) {
         action();
-        this.activeCard = null;
       }
 
       switch (key) {
@@ -190,29 +199,16 @@ export default defineComponent({
       await fyo.singles.GetStarted?.setAndSync(toUpdate);
       await fyo.doc.getDoc('GetStarted');
     },
-    isCompleted(item: ListItem) {
-      return fyo.singles.GetStarted?.get(item.fieldname) || false;
-    },
-    getIconComponent(item: ListItem) {
-      let completed = fyo.singles.GetStarted?.[item.fieldname] || false;
-      let name = completed ? 'green-check' : item.icon;
-      let size = completed ? '24' : '18';
-      return {
-        name,
-        render() {
-          // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
-          return h(Icon, {
-            ...Object.assign(
-              {
-                name,
-                size,
-              },
-              this.$attrs
-            ),
-          });
-        },
-      } as Component;
-    },
   },
 });
 </script>
+
+<style scoped>
+.get-started-actions :deep(button) {
+  background-color: var(--sidebar-bg) !important;
+  color: var(--text) !important;
+}
+.get-started-actions :deep(button *) {
+  color: var(--text) !important;
+}
+</style>

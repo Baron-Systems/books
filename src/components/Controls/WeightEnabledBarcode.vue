@@ -31,6 +31,7 @@
 </template>
 
 <script lang="ts">
+import { getItemNameByBarcode } from 'models/helpers';
 import { showToast } from 'src/utils/interactive';
 import { defineComponent } from 'vue';
 export default defineComponent({
@@ -75,12 +76,7 @@ export default defineComponent({
       this.cooldown = barcode;
       setTimeout(() => (this.cooldown = ''), 100);
 
-      const matchedItems = (await this.fyo.db.getAll('Item', {
-        filters: { barcode },
-        fields: ['name'],
-      })) as { name: string }[];
-
-      const itemName = matchedItems?.[0]?.name;
+      const itemName = await getItemNameByBarcode(this.fyo, barcode);
 
       if (itemName) {
         this.success(this.t`${itemName} quantity 1 added.`);
@@ -91,77 +87,69 @@ export default defineComponent({
 
       const isWeightEnabled =
         this.fyo.singles.POSSettings?.weightEnabledBarcode;
-      const checkDigits = this.fyo.singles.POSSettings?.checkDigits as number;
-      const checkDigitsStr = checkDigits.toString();
-
-      const itemCodeDigits = this.fyo.singles.POSSettings
-        ?.itemCodeDigits as number;
-      const itemWeightDigits = this.fyo.singles.POSSettings
-        ?.itemWeightDigits as number;
+      const TYPE7_PREFIX_LEN = 2;
+      const TYPE7_ITEM_CODE_DIGITS = 5;
+      const TYPE7_WEIGHT_DIGITS = 5;
+      const TYPE7_LEN = 13;
 
       if (
-        code.length !==
-        checkDigitsStr.length + itemCodeDigits + itemWeightDigits
+        isWeightEnabled &&
+        code.length === TYPE7_LEN &&
+        /^\d+$/.test(barcode) &&
+        barcode.startsWith('21')
       ) {
-        return this.error(this.t`Barcode ${barcode} has an invalid length.`);
+        const extractedItemCode = barcode.slice(
+          TYPE7_PREFIX_LEN,
+          TYPE7_PREFIX_LEN + TYPE7_ITEM_CODE_DIGITS
+        );
+        const weightPart = barcode.slice(
+          TYPE7_PREFIX_LEN + TYPE7_ITEM_CODE_DIGITS,
+          TYPE7_PREFIX_LEN + TYPE7_ITEM_CODE_DIGITS + TYPE7_WEIGHT_DIGITS
+        );
+
+        const itemsByCode =
+          (await this.fyo.db.getAll('Item', {
+            filters: { itemCode: extractedItemCode },
+            fields: ['name', 'unit'],
+          })) || [];
+        let item = itemsByCode[0];
+        if (!item) {
+          const nameFromBarcode = await getItemNameByBarcode(
+            this.fyo,
+            extractedItemCode
+          );
+          if (nameFromBarcode) {
+            const itemsByName =
+              (await this.fyo.db.getAll('Item', {
+                filters: { name: nameFromBarcode },
+                fields: ['name', 'unit'],
+              })) || [];
+            item = itemsByName[0];
+          }
+        }
+
+        if (!item) {
+          return this.error(this.t`Item with barcode ${barcode} not found.`);
+        }
+
+        const quantity = this.parseType7Weight(weightPart, (item as { unit?: string }).unit);
+        this.success(this.t`${(item as { name: string }).name} quantity ${quantity} added.`);
+        this.$emit('item-selected', (item as { name: string }).name, quantity);
+        return;
       }
 
-      if (!barcode.startsWith(checkDigitsStr)) {
-        return this.error(this.t`Item with barcode ${barcode} not found.`);
-      }
-
-      const filters: Record<string, string> = {
-        itemCode: barcode.slice(
-          checkDigitsStr.length,
-          checkDigitsStr.length + itemCodeDigits
-        ),
-      };
-
-      const fields = ['name', 'unit'];
-
-      const items =
-        (await this.fyo.db.getAll('Item', { filters, fields })) || [];
-      const { name, unit } = items[0] || {};
-
-      if (!name) {
-        return this.error(this.t`Item with barcode ${barcode} not found.`);
-      }
-
-      const quantity = isWeightEnabled
-        ? this.parseBarcode(
-            barcode,
-            unit as string,
-            checkDigitsStr.length + itemCodeDigits
-          )
-        : 1;
-
-      this.success(this.t`${name as string} quantity ${quantity} added.`);
-      this.$emit('item-selected', name, quantity);
+      return this.error(this.t`Barcode ${barcode} has an invalid length.`);
     },
 
-    parseBarcode(barcode: string, unitType: string, sliceDigit: number) {
-      const weightRaw = parseInt(barcode.slice(sliceDigit));
-
-      let itemQuantity = 0;
-
-      switch (unitType) {
-        case 'Kg':
-          itemQuantity = Math.floor(weightRaw / 1000);
-          break;
-        case 'Gram':
-          itemQuantity = weightRaw;
-          break;
-        case 'Unit':
-        case 'Meter':
-        case 'Hour':
-        case 'Day':
-          itemQuantity = weightRaw;
-          break;
-        default:
-          throw new Error('Unknown unit type!');
-      }
-
-      return itemQuantity;
+    parseType7Weight(weightStr: string, unitType?: string): number {
+      if (!/^\d{5}$/.test(weightStr)) return 1;
+      const kgPart = parseInt(weightStr.slice(0, 2), 10);
+      const gramPart = parseInt(weightStr.slice(2, 5), 10);
+      const weightInKg = kgPart + gramPart / 1000;
+      const unit = (unitType ?? '').toLowerCase();
+      if (unit === 'kg') return weightInKg;
+      if (unit === 'gram' || unit === 'g') return Math.round(weightInKg * 1000);
+      return weightInKg;
     },
     async scanListener({ key, code }: KeyboardEvent) {
       /**
@@ -192,7 +180,7 @@ export default defineComponent({
       }, 20);
     },
     async setItemFromBarcode() {
-      if (this.barcode.length < 12) {
+      if (this.barcode.length < 4) {
         return;
       }
 

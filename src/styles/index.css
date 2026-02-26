@@ -6,6 +6,24 @@
   src: url('../assets/fonts/Inter.var.woff2') format('woff2');
 }
 
+/* Cairo (Variable) */
+@font-face {
+  font-family: 'Cairo';
+  font-style: normal;
+  font-weight: 200 1000;
+  font-display: swap;
+  src: url('../assets/fonts/Cairo.var.arabic.woff2') format('woff2');
+  unicode-range: U+0600-06FF, U+0750-077F, U+0870-088E, U+0890-0891, U+0897-08E1, U+08E3-08FF, U+200C-200E, U+2010-2011, U+204F, U+2E41, U+FB50-FDFF, U+FE70-FE74, U+FE76-FEFC, U+102E0-102FB, U+10E60-10E7E, U+10EC2-10EC4, U+10EFC-10EFF, U+1EE00-1EE03, U+1EE05-1EE1F, U+1EE21-1EE22, U+1EE24, U+1EE27, U+1EE29-1EE32, U+1EE34-1EE37, U+1EE39, U+1EE3B, U+1EE42, U+1EE47, U+1EE49, U+1EE4B, U+1EE4D-1EE4F, U+1EE51-1EE52, U+1EE54, U+1EE57, U+1EE59, U+1EE5B, U+1EE5D, U+1EE5F, U+1EE61-1EE62, U+1EE64, U+1EE67-1EE6A, U+1EE6C-1EE72, U+1EE74-1EE77, U+1EE79-1EE7C, U+1EE7E, U+1EE80-1EE89, U+1EE8B-1EE9B, U+1EEA1-1EEA3, U+1EEA5-1EEA9, U+1EEAB-1EEBB, U+1EEF0-1EEF1;
+}
+@font-face {
+  font-family: 'Cairo';
+  font-style: normal;
+  font-weight: 200 1000;
+  font-display: swap;
+  src: url('../assets/fonts/Cairo.var.latin.woff2') format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
 * {
   outline-color: var(--accent-400);
   font-variation-settings: 'slnt' 0deg;
@@ -25,8 +43,14 @@ html {
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   text-rendering: optimizeLegibility;
-  font-family: var(--font-sans, 'Inter', sans-serif);
+  font-family: var(--font-sans, 'Cairo', 'Inter', sans-serif);
   font-size: var(--font-base, 13px);
+  font-weight: var(--font-weight-base, 400);
+}
+
+/* Ensure body and all text inherit the app font (Arabic + Latin) */
+body {
+  font-family: inherit;
 }
 
 html.dark {
@@ -57,8 +81,11 @@ html.dark {
   --danger: #dc2626;
   --info: #0ea5e9;
   --icon: #1f6ae1;
-  --font-sans: 'Inter', sans-serif;
+  --font-sans: 'Cairo', 'Inter', sans-serif;
   --font-base: 16px;
+  --font-weight-base: 400;
+  --font-sidebar: 14px;
+  --font-button: 12px;
   --font-heading: 18px;
   --radius: 6px;
   --shadow: 0 1px 2px rgba(0, 0, 0, 0.06);
@@ -104,7 +131,7 @@ input[type='number']::-webkit-inner-spin-button {
 }
 
 :root {
-  --w-form: 600px;
+  --w-form: 920px;
   --w-app: 1200px;
   --w-sidebar: 14rem;
   --w-desk: calc(100vw - var(--w-sidebar));
@@ -118,7 +145,7 @@ input[type='number']::-webkit-inner-spin-button {
   --h-row-small: 2.5rem;
   --h-row-mid: 3rem;
   --h-row-large: 3.5rem;
-  --h-row-largest: 4rem;
+  --h-row-largest: 3.5rem;
   --h-app: 800px;
 
   /*
@@ -242,7 +269,8 @@ html.theme-purple {
 }
 
 .w-sidebar {
-  width: var(--w-sidebar);
+  min-width: var(--w-sidebar);
+  width: max-content;
 }
 
 .w-desk {
@@ -392,6 +420,80 @@ html.dark .accent-icon-bg {
   background-color: var(--accent-600);
 }
 
+/* Theme-tinted surfaces (derived from brand / accent) */
+.theme-tinted-bg {
+  background-color: var(--header-bg, var(--accent-50)) !important;
+}
+html.dark .theme-tinted-bg {
+  background-color: rgba(255, 255, 255, 0.03) !important;
+}
+.theme-tinted-border {
+  border-color: var(--accent-200) !important;
+}
+html.dark .theme-tinted-border {
+  border-color: rgba(255, 255, 255, 0.08) !important;
+}
+
+/* Table header "pill" labels */
+.table-header-pill {
+  display: inline-flex;
+  align-items: center;
+  height: 1.75rem;
+  padding: 0 0.6rem;
+  border-radius: 0.75rem;
+  border: 1px solid var(--accent-200);
+  background: transparent;
+  color: var(--text);
+  transition: background-color 120ms ease, border-color 120ms ease;
+}
+.table-header-pill:hover {
+  background: var(--accent-50);
+  border-color: var(--accent-400);
+}
+html.dark .table-header-pill {
+  background: transparent;
+  border-color: rgba(255, 255, 255, 0.12);
+  color: var(--text);
+}
+html.dark .table-header-pill:hover {
+  background: rgba(255, 255, 255, 0.05);
+  border-color: rgba(255, 255, 255, 0.18);
+}
+
+/* Elevated header helper */
+.header-elevated {
+  box-shadow: 0 1px 0 rgba(0, 0, 0, 0.04);
+}
+html.dark .header-elevated {
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.04);
+}
+
+/* List readability (zebra rows) */
+.list-row {
+  background: transparent;
+}
+.list-row-alt {
+  background: rgba(0, 0, 0, 0.015);
+}
+html.dark .list-row-alt {
+  background: rgba(255, 255, 255, 0.03);
+}
+
+/* Sidebar sub-item indicator (replaces "dot") */
+.sidebar-sub-indicator {
+  width: 0.55rem;
+  height: 0.55rem;
+  border-radius: 999px;
+  border: 2px solid var(--border-color);
+  background: transparent;
+  opacity: 0.55;
+}
+.sidebar-sub-indicator-active {
+  border-color: rgba(255, 255, 255, 0.85);
+  background: rgba(255, 255, 255, 0.85);
+  opacity: 1;
+}
+
 .accent-chip {
   color: var(--accent-700);
   background-color: var(--accent-100);
@@ -415,6 +517,70 @@ html.dark .accent-chip {
 .sidebar-bg {
   background-color: var(--sidebar-bg);
 }
+.sidebar-text {
+  font-size: var(--font-sidebar, var(--font-base)) !important;
+}
+
+/*
+  Sidebar icon tint (per section)
+  We set local accent vars so IconBase uses them when `active=true`.
+*/
+.sidebar-icon-tone-active {
+  --accent-100: rgba(255, 255, 255, 0.95);
+  --accent-700: rgba(255, 255, 255, 0.95);
+  --accent-900: rgba(255, 255, 255, 0.95);
+}
+.sidebar-icon-tone-dashboard {
+  --accent-100: #DBEAFE;
+  --accent-700: #1D4ED8;
+  --accent-900: #1E3A8A;
+}
+.sidebar-icon-tone-sales {
+  --accent-100: #DCFCE7;
+  --accent-700: #15803D;
+  --accent-900: #14532D;
+}
+.sidebar-icon-tone-purchase {
+  --accent-100: #FFEDD5;
+  --accent-700: #C2410C;
+  --accent-900: #7C2D12;
+}
+.sidebar-icon-tone-common-entries {
+  --accent-100: #EDE9FE;
+  --accent-700: #6D28D9;
+  --accent-900: #4C1D95;
+}
+.sidebar-icon-tone-reports {
+  --accent-100: #CCFBF1;
+  --accent-700: #0F766E;
+  --accent-900: #134E4A;
+}
+.sidebar-icon-tone-inventory {
+  --accent-100: #FEF9C3;
+  --accent-700: #A16207;
+  --accent-900: #713F12;
+}
+.sidebar-icon-tone-pos {
+  --accent-100: #FCE7F3;
+  --accent-700: #BE185D;
+  --accent-900: #831843;
+}
+.sidebar-icon-tone-gst {
+  --accent-100: #E0E7FF;
+  --accent-700: #4338CA;
+  --accent-900: #312E81;
+}
+.sidebar-icon-tone-settings {
+  --accent-100: #E5E7EB;
+  --accent-700: #374151;
+  --accent-900: #111827;
+}
+.sidebar-icon-tone-general {
+  --accent-100: #CFFAFE;
+  --accent-700: #0E7490;
+  --accent-900: #164E63;
+}
+
 .app-border {
   border-color: var(--border-color);
 }
@@ -480,6 +646,7 @@ svg,
   background-color: var(--primary) !important;
   color: #fff !important;
   box-shadow: var(--shadow) !important;
+  font-size: var(--font-button, var(--font-base)) !important;
 }
 .btn-primary * {
   color: #fff !important;
@@ -488,6 +655,7 @@ svg,
   background-color: var(--surface-bg) !important;
   border: 1px solid var(--border-color) !important;
   color: var(--text) !important;
+  font-size: var(--font-button, var(--font-base)) !important;
 }
 .btn-secondary * {
   color: var(--text) !important;
@@ -496,6 +664,7 @@ svg,
   background-color: transparent !important;
   border: 1px solid var(--primary) !important;
   color: var(--primary) !important;
+  font-size: var(--font-button, var(--font-base)) !important;
 }
 .btn-outline * {
   color: var(--primary) !important;
@@ -503,6 +672,7 @@ svg,
 .btn-ghost {
   background-color: transparent !important;
   color: var(--text) !important;
+  font-size: var(--font-button, var(--font-base)) !important;
 }
 .btn-ghost * {
   color: var(--text) !important;
@@ -539,7 +709,131 @@ h3 {
   font-size: var(--font-heading);
 }
 
+/* POS: تمييز المجموع الكلي */
+.grand-total-input input {
+  font-weight: 700;
+}
+
 /* Icon style (limited) */
 html.icons-filled .fill-current {
   fill: currentColor;
+}
+
+/* Print templates (invoice-print, thermal-receipt) – used by compiled template strings */
+.invoice-print {
+  font-family: Cairo, Tahoma, Arial, sans-serif;
+}
+.invoice-print .invoice-header {
+  padding: 0.5rem 0 0.75rem;
+}
+.invoice-print .invoice-header .logo-img,
+.invoice-print .logo-img {
+  max-height: 56px;
+  max-width: 140px;
+  object-fit: contain;
+}
+.invoice-print .invoice-meta-grid {
+  display: grid;
+  gap: 0.25rem 0.5rem;
+}
+.invoice-print .invoice-table {
+  border-collapse: collapse;
+  width: 100%;
+  table-layout: fixed;
+}
+.invoice-print .invoice-table th,
+.invoice-print .invoice-table td {
+  border: 1px solid #e2e8f0;
+  padding: 0.4rem 0.5rem;
+}
+.invoice-print .invoice-table th {
+  background: #f1f5f9;
+  font-weight: 600;
+}
+.invoice-print .invoice-table .col-item {
+  width: 28%;
+}
+.invoice-print .invoice-table .col-qty {
+  width: 10%;
+  text-align: center;
+}
+.invoice-print .invoice-table .col-rate {
+  width: 14%;
+  text-align: right;
+}
+.invoice-print .invoice-table .col-amount {
+  width: 14%;
+  text-align: right;
+}
+.invoice-print .invoice-table .num {
+  font-variant-numeric: tabular-nums;
+}
+.invoice-print .totals-table {
+  width: 100%;
+  max-width: 320px;
+  margin-right: auto;
+  margin-left: 0;
+  border-collapse: collapse;
+}
+.invoice-print .totals-table td {
+  padding: 0.35rem 0.5rem;
+  border-bottom: 1px solid #e2e8f0;
+}
+.invoice-print .totals-table .grand-row td {
+  font-size: 1.1rem;
+  font-weight: 700;
+  border-bottom: none;
+  padding-top: 0.5rem;
+}
+.invoice-print .totals-box {
+  border: 1px solid #e2e8f0;
+  background: #f8fafc;
+  padding: 0.75rem 1rem;
+  max-width: 300px;
+  margin-right: auto;
+}
+.invoice-print .meta-grid {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 0.25rem 0.75rem;
+}
+.thermal-receipt {
+  font-family: Cairo, Tahoma, Arial, sans-serif;
+  font-size: 11px;
+  line-height: 1.3;
+}
+.thermal-receipt .logo-img {
+  max-height: 36px;
+  max-width: 100%;
+  object-fit: contain;
+}
+.thermal-receipt .receipt-table {
+  border-collapse: collapse;
+  width: 100%;
+  font-size: 10px;
+}
+.thermal-receipt .receipt-table th,
+.thermal-receipt .receipt-table td {
+  border: none;
+  border-bottom: 1px dotted #ccc;
+  padding: 2px 3px;
+  vertical-align: top;
+}
+.thermal-receipt .receipt-table th {
+  background: #f0f0f0;
+  font-weight: 600;
+}
+.thermal-receipt .receipt-table .col-item {
+  width: 38%;
+  max-width: 38%;
+  word-wrap: break-word;
+}
+.thermal-receipt .receipt-table .col-num {
+  text-align: right;
+  width: 18%;
+  font-variant-numeric: tabular-nums;
+}
+.thermal-receipt .receipt-table .item-name {
+  word-break: break-word;
+  line-height: 1.25;
 }

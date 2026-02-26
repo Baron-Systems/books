@@ -16,6 +16,13 @@ import type { SearchGroup, SearchItem } from '../../utils/types';
 export { searchGroups };
 export type { SearchGroup, SearchItem };
 
+// Schemas that should be hidden from the global search
+const ERP_NEXT_SEARCH_EXCLUDED_SCHEMAS: string[] = [
+  ModelNameEnum.ERPNextSyncSettings,
+  ModelNameEnum.ERPNextSyncQueue,
+  ModelNameEnum.FetchFromERPNextQueue,
+];
+
 interface StoredRecentItem {
   label: string;
   group: string;
@@ -232,7 +239,13 @@ function getListViewList(fyo: Fyo): SearchItem[] {
 
   const standardLists = schemaNames
     .map((s) => fyo.schemaMap[s])
-    .filter((s) => s && !s.isChild && !s.isSingle)
+    .filter(
+      (s) =>
+        s &&
+        !s.isChild &&
+        !s.isSingle &&
+        !ERP_NEXT_SEARCH_EXCLUDED_SCHEMAS.includes(String(s.name))
+    )
     .map(
       (s) =>
         ({
@@ -877,7 +890,11 @@ export class Search {
   _setSearchables() {
     for (const schemaName of Object.keys(this.fyo.schemaMap)) {
       const schema = this.fyo.schemaMap[schemaName];
-      if (!schema?.keywordFields?.length || this.searchables[schemaName]) {
+      if (
+        !schema?.keywordFields?.length ||
+        this.searchables[schemaName] ||
+        ERP_NEXT_SEARCH_EXCLUDED_SCHEMAS.includes(schemaName)
+      ) {
         continue;
       }
 

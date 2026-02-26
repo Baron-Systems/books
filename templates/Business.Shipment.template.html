@@ -1,4 +1,4 @@
-<main class="bg-white h-full" :style="{ 'font-family': print.font }">
+<main dir="rtl" lang="ar" class="bg-white h-full" :style="{ 'font-family': print.font }">
   <!-- Invoice Header -->
   <header class="bg-gray-100 px-12 py-10">
     <!-- Company Details -->
@@ -14,12 +14,12 @@
           {{ print.companyName }}
         </p>
 
-        <p class="text-sm text-gray-800" v-if="print.address">
+        <p class="text-sm text-gray-800" v-if="print.address && print.links && print.links.address">
           {{ print.links.address.addressDisplay }}
         </p>
 
         <p class="text-sm text-gray-800" v-if="print.gstin">
-          GSTIN: {{ print.gstin }}
+          {{ t`GSTIN No.` }}: {{ print.gstin }}
         </p>
       </div>
     </section>
@@ -41,16 +41,18 @@
 
       <!-- Party Details -->
       <section class="mt-4 flex">
-        <h3 class="w-1/3 font-semibold">{{t`party`}}</h3>
+        <h3 class="w-1/3 font-semibold">{{ t`Party` }}</h3>
 
         <div class="w-2/3 text-gray-800" v-if="doc.party">
           <p class="font-semibold">{{ doc.party }}</p>
 
-          <p v-if="doc.links.party.address">
+          <p v-if="doc.links && doc.links.party && doc.links.party.links && doc.links.party.links.address">
             {{ doc.links.party.links.address.addressDisplay }}
           </p>
 
-          <p v-if="doc.links.party.gstin">GSTIN: {{ doc.links.party.gstin }}</p>
+          <p v-if="doc.links && doc.links.party && doc.links.party.gstin">
+            {{ t`GSTIN No.` }}: {{ doc.links.party.gstin }}
+          </p>
         </div>
       </section>
     </div>
@@ -109,7 +111,7 @@
 
     <!-- Invoice Terms -->
     <section class="mt-12" v-if="doc.terms">
-      <h3 class="text-lg font-semibold">Notes</h3>
+      <h3 class="text-lg font-semibold">{{ t`Notes` }}</h3>
 
       <p class="mt-4 text-lg whitespace-pre-line">{{ doc.terms }}</p>
     </section>

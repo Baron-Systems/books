@@ -5,13 +5,9 @@
       <hr class="dark:border-gray-800" />
       <div class="mx-6 my-3">
         <component
-          :is="selectedItemRow?.fieldMap[selectedItemField!].fieldtype"
+          :is="dynamicComponent"
           ref="dynamicInput"
-          :df="{
-            fieldname: selectedItemRow?.fieldMap[selectedItemField!].fieldname as string,
-            fieldtype: selectedItemRow?.fieldMap[selectedItemField!].fieldtype,
-            label: selectedItemRow?.fieldMap[selectedItemField!].label as string,
-          }"
+          :df="dynamicDf"
           class="mb-3"
           :border="true"
           :show-label="true"
@@ -284,7 +280,8 @@
         <div class="grid row-start-6 grid-cols-2 gap-4 mt-auto mb-3">
           <div class="col-span-2">
             <Button
-              class="w-full bg-green-500 dark:bg-green-700"
+              type="primary"
+              class="w-full"
               style="padding: 1.35rem"
               @click="saveSelectedItem()"
             >
@@ -300,12 +297,13 @@
         <div class="grid row-start-6 grid-cols-2 gap-4 mt-auto mb-8">
           <div class="col-span-2">
             <Button
-              class="w-full bg-red-500 dark:bg-red-700"
+              type="secondary"
+              class="w-full"
               style="padding: 1.35rem"
               @click="closeKeyboardModal()"
             >
               <slot>
-                <p class="uppercase text-lg text-white font-semibold">
+                <p class="uppercase text-lg font-semibold">
                   {{ t`Cancel` }}
                 </p>
               </slot>
@@ -357,6 +355,22 @@ export default defineComponent({
     return {
       selectedValue: '',
     };
+  },
+  computed: {
+    dynamicComponent(): any {
+      const fieldtype =
+        this.selectedItemRow?.fieldMap?.[this.selectedItemField]?.fieldtype;
+      // Only render supported numeric inputs here.
+      return fieldtype === ModelNameEnum.Currency ? 'Currency' : 'Float';
+    },
+    dynamicDf(): any {
+      const field = this.selectedItemRow?.fieldMap?.[this.selectedItemField];
+      return {
+        fieldname: String(field?.fieldname ?? ''),
+        fieldtype: field?.fieldtype,
+        label: String(field?.label ?? ''),
+      };
+    },
   },
   watch: {
     async modalStatus(newVal) {

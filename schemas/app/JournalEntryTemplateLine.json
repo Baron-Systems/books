@@ -1,0 +1,75 @@
+{
+  "name": "JournalEntryTemplateLine",
+  "label": "Journal Entry Template Line",
+  "isChild": true,
+  "fields": [
+    {
+      "fieldname": "account",
+      "label": "Account",
+      "fieldtype": "Link",
+      "target": "Account",
+      "required": true,
+      "groupBy": "rootType"
+    },
+    {
+      "fieldname": "defaultDebit",
+      "label": "Default Debit",
+      "fieldtype": "Currency"
+    },
+    {
+      "fieldname": "defaultCredit",
+      "label": "Default Credit",
+      "fieldtype": "Currency"
+    },
+    {
+      "fieldname": "allowEditDebit",
+      "label": "Allow Edit Debit",
+      "fieldtype": "Check",
+      "default": true
+    },
+    {
+      "fieldname": "allowEditCredit",
+      "label": "Allow Edit Credit",
+      "fieldtype": "Check",
+      "default": true
+    },
+    {
+      "fieldname": "allowEditAccount",
+      "label": "Allow Edit Account",
+      "fieldtype": "Check",
+      "default": false
+    },
+    {
+      "fieldname": "partyType",
+      "label": "Party Type",
+      "fieldtype": "Data"
+    },
+    {
+      "fieldname": "party",
+      "label": "Party",
+      "fieldtype": "Data"
+    },
+    {
+      "fieldname": "costCenter",
+      "label": "Cost Center",
+      "fieldtype": "Data"
+    },
+    {
+      "fieldname": "project",
+      "label": "Project",
+      "fieldtype": "Data"
+    },
+    {
+      "fieldname": "branch",
+      "label": "Branch",
+      "fieldtype": "Data"
+    },
+    {
+      "fieldname": "remarks",
+      "label": "Remarks",
+      "fieldtype": "Text"
+    }
+  ],
+  "tableFields": ["account", "defaultDebit", "allowEditDebit", "defaultCredit", "allowEditCredit", "allowEditAccount", "remarks"],
+  "keywordFields": ["account"]
+}

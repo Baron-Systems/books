@@ -30,6 +30,7 @@
       :sinv-doc="(sinvDoc as SalesInvoice)"
       :disable-pay-button="disablePayButton"
       :open-payment-modal="openPaymentModal"
+      :open-payment-modal-for-pay="openPaymentModalForPay"
       :item-discounts="(itemDiscounts as Money)"
       :coupons="(coupons as AppliedCouponCodes)"
       :open-price-list-modal="openPriceListModal"
@@ -66,6 +67,7 @@
       @set-transfer-clearance-date="setTransferClearanceDate"
       @save-and-continue="handleSaveAndContinue"
       @handle-payment-action="handlePaymentAction"
+      @register-only="handleRegisterOnlyAction"
       @selected-row="setQuickQtySelectedRow"
       @batch-selected="handleBatchSelected"
     />
@@ -86,6 +88,7 @@
       :sinv-doc="(sinvDoc as SalesInvoice)"
       :disable-pay-button="disablePayButton"
       :open-payment-modal="openPaymentModal"
+      :open-payment-modal-for-pay="openPaymentModalForPay"
       :open-keyboard-modal="openKeyboardModal"
       :item-discounts="(itemDiscounts as Money)"
       :coupons="(coupons as AppliedCouponCodes)"
@@ -124,6 +127,7 @@
       @set-transfer-clearance-date="setTransferClearanceDate"
       @selected-row="setQuickQtySelectedRow"
       @handle-payment-action="handlePaymentAction"
+      @register-only="handleRegisterOnlyAction"
       @batch-selected="handleBatchSelected"
     />
   </div>
@@ -165,7 +169,9 @@ import {
   getPricingRule,
   removeFreeItems,
   getItemRateFromPriceList,
+  getItemRateFromPriceListForItem,
   getItemVisibility,
+  getItemNameByBarcode,
 } from 'models/helpers';
 import {
   POSItem,
@@ -216,6 +222,7 @@ export default defineComponent({
 
       openAlertModal: false,
       openPaymentModal: false,
+      openPaymentModalForPay: false,
       openKeyboardModal: false,
       openPriceListModal: false,
       openItemEnquiryModal: false,
@@ -288,6 +295,11 @@ export default defineComponent({
         this.updateValues();
       },
       deep: true,
+    },
+    'sinvDoc.priceList': {
+      handler() {
+        this.setItems();
+      },
     },
   },
 
@@ -516,71 +528,70 @@ export default defineComponent({
       if (!addItem) return;
 
       let quantity = 1;
-      const posSettings = fyo.singles.POSSettings;
-      const isWeightEnabledBarcode = posSettings?.weightEnabledBarcode;
+      const TYPE7_PREFIX = '21';
+      const TYPE7_PREFIX_LEN = 2;
+      const TYPE7_ITEM_CODE_DIGITS = 5;
+      const TYPE7_WEIGHT_DIGITS = 5;
+      const TYPE7_LEN = 13;
 
-      const checkDigits = posSettings?.checkDigits || '';
-      const itemCodeDigits = posSettings?.itemCodeDigits || 0;
-      const weightDigits = posSettings?.itemWeightDigits || 0;
+      // Rule: starts with 21 and length 13 → weight barcode; otherwise → normal item barcode
+      const isType7WeightBarcode =
+        searchTerm.length === TYPE7_LEN &&
+        searchTerm.startsWith(TYPE7_PREFIX) &&
+        /^\d+$/.test(searchTerm);
 
-      const expectedWeightBarcodeLength =
-        String(checkDigits).length +
-        Number(itemCodeDigits) +
-        Number(weightDigits);
-
-      let isWeightBarcode = false;
-      let itemCode = searchTerm;
+      let matchedItem: { name: string; itemCode?: string; unit?: string } | null = null;
       let weightPart = '';
 
-      if (
-        isWeightEnabledBarcode &&
-        searchTerm.length === expectedWeightBarcodeLength
-      ) {
+      if (isType7WeightBarcode) {
         const extractedItemCode = searchTerm.slice(
-          checkDigits.toString().length,
-          checkDigits.toString().length + itemCodeDigits
+          TYPE7_PREFIX_LEN,
+          TYPE7_PREFIX_LEN + TYPE7_ITEM_CODE_DIGITS
         );
-        const weightData = searchTerm.slice(
-          checkDigits.toString().length + itemCodeDigits
+        weightPart = searchTerm.slice(
+          TYPE7_PREFIX_LEN + TYPE7_ITEM_CODE_DIGITS,
+          TYPE7_PREFIX_LEN + TYPE7_ITEM_CODE_DIGITS + TYPE7_WEIGHT_DIGITS
         );
 
-        if (!isNaN(Number(weightData))) {
-          isWeightBarcode = true;
-          itemCode = extractedItemCode;
-          weightPart = weightData;
+        const allItems = (await this.fyo.db.getAll(ModelNameEnum.Item, {
+          fields: ['name', 'itemCode', 'unit'],
+        })) as { name: string; itemCode?: string; unit?: string }[];
+        matchedItem = allItems.find((item) => item.itemCode === extractedItemCode) ?? null;
+        if (!matchedItem) {
+          const nameFromBarcode = await getItemNameByBarcode(this.fyo, extractedItemCode);
+          if (nameFromBarcode)
+            matchedItem = allItems.find((item) => item.name === nameFromBarcode) ?? null;
         }
       }
 
-      const allItems = await this.fyo.db.getAll(ModelNameEnum.Item, {
-        fields: ['name', 'barcode', 'itemCode', 'unit'],
-      });
-
-      let matchedItem = null;
-
-      if (isWeightBarcode) {
-        matchedItem = allItems.find(
-          (item) => item.itemCode === itemCode || item.barcode === itemCode
-        );
-      } else if (searchTerm.length === 12) {
-        matchedItem = allItems.find((item) => item.barcode === searchTerm);
-      }
-
       if (!matchedItem) {
-        matchedItem = allItems.find((item) => item.name === searchTerm);
+        const itemName = await getItemNameByBarcode(this.fyo, searchTerm);
+        const allItems = (await this.fyo.db.getAll(ModelNameEnum.Item, {
+          fields: ['name', 'itemCode', 'unit'],
+        })) as { name: string; itemCode?: string; unit?: string }[];
+        if (itemName)
+          matchedItem = allItems.find((item) => item.name === itemName) ?? null;
+        if (!matchedItem)
+          matchedItem = allItems.find((item) => item.name === searchTerm) ?? null;
       }
 
       if (!matchedItem) return;
 
-      if (isWeightBarcode && weightPart) {
-        const weightValue = parseInt(weightPart, 10);
-        if ((matchedItem.unit as string)?.toLowerCase() === 'kg') {
-          quantity = weightValue / 1000;
+      if (isType7WeightBarcode && weightPart && /^\d{5}$/.test(weightPart)) {
+        const kgPart = parseInt(weightPart.slice(0, 2), 10);
+        const gramPart = parseInt(weightPart.slice(2, 5), 10);
+        const weightInKg = kgPart + gramPart / 1000;
+        const unit = (matchedItem.unit ?? '').toLowerCase();
+        if (unit === 'kg') {
+          quantity = weightInKg;
+        } else if (unit === 'gram' || unit === 'g') {
+          quantity = Math.round(weightInKg * 1000);
         } else {
-          quantity = weightValue;
+          quantity = weightInKg;
         }
       }
 
-      const itemDoc = this.getItem(matchedItem.name as string);
+      const itemDoc = this.getItem(matchedItem.name);
       if (itemDoc && addItem) {
         await this.addItem(itemDoc as POSItem, quantity);
         this.itemSearchTerm = '';
@@ -707,6 +718,7 @@ export default defineComponent({
       })) as Item[];
 
       this.items = [] as POSItem[];
+      const priceListName = this.sinvDoc?.priceList;
       for (const item of items) {
         let availableQty = 0;
 
@@ -721,11 +733,24 @@ export default defineComponent({
           continue;
         }
 
+        let rate = item.rate as Money;
+        if (priceListName) {
+          const priceListRate = await getItemRateFromPriceListForItem(
+            this.fyo,
+            item.name,
+            typeof item.unit === 'string' ? item.unit : undefined,
+            priceListName
+          );
+          if (priceListRate) {
+            rate = priceListRate;
+          }
+        }
+
         this.items.push({
           availableQty,
           name: item.name,
           image: item?.image as string,
-          rate: item.rate as Money,
+          rate,
           unit: item.unit as string,
           hasBatch: !!item.hasBatch,
           hasSerialNumber: !!item.hasSerialNumber,
@@ -925,6 +950,7 @@ export default defineComponent({
             item: item.name,
             quantity: addQty,
             hsnCode: itemsHsncode,
+            transferUnit: item.unit,
           });
           await this.applyPricingRule();
           await this.sinvDoc.runFormulas();
@@ -965,6 +991,7 @@ export default defineComponent({
           item: item.name,
           quantity: quantity ? quantity : 1,
           hsnCode: itemsHsncode,
+          transferUnit: item.unit,
         });
 
         if (this.sinvDoc.priceList) {
@@ -1043,6 +1070,7 @@ export default defineComponent({
             quantity: quantity ?? 1,
             hsnCode: itemDoc.hsnCode,
             batch: batchName,
+            transferUnit: item.unit ?? itemDoc.unit,
           });
         }
 
@@ -1060,9 +1088,38 @@ export default defineComponent({
 
     async createTransaction(shouldPrint = false, isPay = false) {
       try {
+        // Register-only: ensure payment modal never shows during or after this flow
+        if (!isPay) {
+          this.openPaymentModal = false;
+          this.openPaymentModalForPay = false;
+        }
+
         this.sinvDoc.date = new Date();
         await this.validate();
+
+        // Register-only: no popup, no new payment — only allocate existing party balance via _applyAutomaticBalanceAdjustment
+        if (!isPay) {
+          (this.sinvDoc as unknown as { __registerOnlyNoAutoPayment?: boolean }).__registerOnlyNoAutoPayment = true;
+        }
         await this.submitSinvDoc();
+        if (!isPay) {
+          delete (this.sinvDoc as unknown as { __registerOnlyNoAutoPayment?: boolean }).__registerOnlyNoAutoPayment;
+        }
+
+        // Only cancel linked payments when we are about to create a new payment (Pay flow)
+        if (isPay) {
+          const paymentIds = await this.sinvDoc.getPaymentIds();
+          for (const paymentId of paymentIds) {
+            const paymentDoc = (await this.fyo.doc.getDoc(
+              ModelNameEnum.Payment,
+              paymentId
+            )) as Payment;
+            await paymentDoc.cancel();
+          }
+          if (paymentIds.length) {
+            await this.sinvDoc.load();
+          }
+        }
 
         const itemVisibility = await getItemVisibility(this.fyo);
 
@@ -1087,6 +1144,10 @@ export default defineComponent({
         await this.afterTransaction();
         await this.setItems();
       } catch (error) {
+        if (!isPay) {
+          this.openPaymentModal = false;
+          this.openPaymentModalForPay = false;
+        }
         showToast({
           type: 'error',
           message: t`${error as string}`,
@@ -1094,6 +1155,9 @@ export default defineComponent({
       }
     },
     async makePayment(shouldPrint: boolean) {
+      if (this.paidAmount.isZero()) {
+        return null;
+      }
       this.paymentDoc = this.sinvDoc.getPayment() as Payment;
       if (!this.paymentDoc) {
         return null;
@@ -1223,6 +1287,7 @@ export default defineComponent({
         await this.clearValues();
         this.setSinvDoc();
       }
+      this.openPaymentModalForPay = false;
       this.toggleModal('Payment', false);
     },
     async clearValues() {
@@ -1238,7 +1303,7 @@ export default defineComponent({
       }
     },
     toggleModal(modal: ModalName, value?: boolean) {
-      if (value) {
+      if (value !== undefined) {
         return (this[`open${modal}Modal`] = value);
       }
 
@@ -1350,8 +1415,22 @@ export default defineComponent({
         this.showValidationToast('payment');
         return;
       }
-
+      this.openPaymentModalForPay = true;
+      this.setPaymentMethod('Cash');
+      const raw =
+        (this.sinvDoc.grandTotal ?? this.sinvDoc.outstandingAmount) ?? 0;
+      this.setPaidAmount(fyo.pesa(String(raw)));
+      this.transferAmount = fyo.pesa(0);
       this.toggleModal('Payment', true);
+    },
+    async handleRegisterOnlyAction() {
+      if (!this.sinvDoc.items?.length || !this.sinvDoc.party) {
+        this.showValidationToast('payment');
+        return;
+      }
+      this.openPaymentModalForPay = false;
+      this.openPaymentModal = false;
+      await this.createTransaction(false, false);
     },
     routeTo,
   },

@@ -140,7 +140,7 @@
       "fieldtype": "Check",
       "default": false,
       "readOnly": false,
-      "tab": "Settings"
+      "section": "Settings"
     },
     {
       "fieldname": "makeAutoPayment",
@@ -148,12 +148,12 @@
       "fieldtype": "Check",
       "default": false,
       "readOnly": false,
-      "tab": "Settings"
+      "section": "Settings"
     },
     {
       "abstract": true,
       "fieldname": "makeAutoStockTransfer",
-      "tab": "Settings"
+      "section": "Settings"
     },
     {
       "fieldname": "outstandingAmount",

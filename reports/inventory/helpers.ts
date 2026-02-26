@@ -11,6 +11,23 @@ import type {
 import type { QueryFilter } from 'utils/db/types';
 import type { StockTransfer } from 'models/inventory/StockTransfer';
 
+export async function getItemUnits(
+  fyo: Fyo,
+  itemNames: string[]
+): Promise<Record<string, string>> {
+  const unique = [...new Set(itemNames)].filter(Boolean);
+  if (unique.length === 0) return {};
+  const rows = (await fyo.db.getAllRaw(ModelNameEnum.Item, {
+    fields: ['name', 'unit'],
+    filters: { name: ['in', unique] },
+  })) as { name: string; unit?: string }[];
+  const map: Record<string, string> = {};
+  for (const row of rows) {
+    map[row.name] = row.unit ?? '';
+  }
+  return map;
+}
+
 type Item = string;
 type Location = string;
 type Batch = string;
@@ -93,6 +110,7 @@ export async function getShipmentCOGSAmountFromSLEs(
 
     if (!sq) {
       total = total.add(stAmount);
+      continue;
     }
 
     const stRate = item.rate?.float ?? 0;
@@ -279,6 +297,7 @@ function updateOpeningBalances(
   sbe: StockBalanceEntry,
   sle: ComputedStockLedgerEntry
 ) {
+  if (sbe.unit === undefined && sle.unit !== undefined) sbe.unit = sle.unit;
   sbe.openingQuantity += sle.quantity;
   sbe.openingValue += sle.valueChange;
 
@@ -290,6 +309,7 @@ function updateCurrentBalances(
   sbe: StockBalanceEntry,
   sle: ComputedStockLedgerEntry
 ) {
+  if (sbe.unit === undefined && sle.unit !== undefined) sbe.unit = sle.unit;
   sbe.balanceQuantity += sle.quantity;
   sbe.balanceValue += sle.valueChange;
 

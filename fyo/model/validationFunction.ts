@@ -52,7 +52,8 @@ export function validateOptions(field: OptionField, value: string, doc: Doc) {
 }
 
 export function validateRequired(field: Field, value: DocValue, doc: Doc) {
-  if (!getIsNullOrUndef(value)) {
+  const isEmptyString = typeof value === 'string' && value.trim() === '';
+  if (!getIsNullOrUndef(value) && !isEmptyString) {
     return;
   }
 

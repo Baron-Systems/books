@@ -262,6 +262,45 @@ const ipc = {
     },
   },
 
+  async authHashPassword(
+    password: string
+  ): Promise<{ ok: true; hash: string } | { ok: false; error: string }> {
+    try {
+      const res: unknown = await ipcRenderer.invoke(
+        IPC_ACTIONS.AUTH_HASH_PASSWORD,
+        password
+      );
+      return JSON.parse(JSON.stringify(res)) as
+        | { ok: true; hash: string }
+        | { ok: false; error: string };
+    } catch (err) {
+      return {
+        ok: false,
+        error: err != null ? String(err) : 'Password hash failed',
+      };
+    }
+  },
+
+  async authVerifyPassword(
+    password: string,
+    hash: string
+  ): Promise<
+    { ok: true; result: boolean } | { ok: false; result: false }
+  > {
+    try {
+      const res: unknown = await ipcRenderer.invoke(
+        IPC_ACTIONS.AUTH_VERIFY_PASSWORD,
+        password,
+        hash
+      );
+      return JSON.parse(JSON.stringify(res)) as
+        | { ok: true; result: boolean }
+        | { ok: false; result: false };
+    } catch {
+      return { ok: false, result: false };
+    }
+  },
+
   store: {
     get<K extends keyof ConfigMap>(key: K) {
       return config.get(key);

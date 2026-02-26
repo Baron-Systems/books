@@ -3,7 +3,8 @@ import type { Action } from 'fyo/model/types';
 import type { ModelNameEnum } from 'models/types';
 import type { Field, FieldType } from 'schemas/types';
 import type { QueryFilter } from 'utils/db/types';
-import type { Ref } from 'vue';
+import type { Component, Ref } from 'vue';
+import type { Router } from 'vue-router';
 import type { toastDurationMap } from './ui';
 
 export type DocRef<D extends Doc = Doc> = Ref<D | null>;
@@ -53,6 +54,8 @@ export interface SidebarRoot {
   iconSize?: string;
   iconHeight?: number;
   hidden?: () => boolean;
+  /** معرف الواجهة؛ إن وُجد يُفحص قبل إظهار العنصر */
+  interfaceId?: string;
   items?: SidebarItem[];
   filters?: QueryFilter;
 }
@@ -63,6 +66,8 @@ export interface SidebarItem {
   route: string;
   schemaName?: string;
   hidden?: () => boolean;
+  /** معرف الواجهة؛ إن وُجد يُفحص قبل إظهار العنصر */
+  interfaceId?: string;
   filters?: QueryFilter;
 }
 
@@ -90,9 +95,9 @@ export type ActionGroup = {
 export type DropdownItem = {
   label: string;
   value?: string;
-  action?: () => unknown;
+  action?: ((doc: Doc, router: Router) => unknown) | (() => unknown);
   group?: string;
-  component?: { template: string };
+  component?: Component;
   isGroup?: boolean;
 };
 

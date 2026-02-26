@@ -1,71 +1,136 @@
 <template>
   <div class="flex flex-col">
-    <PageHeader :title="title">
-      <Button
-        v-if="
-          schemaName === 'Item' &&
-          (!isSelectionMode || (isSelectionMode && selectedItems.length === 0))
-        "
-        @click="toggleSelectionMode"
-      >
-        {{ t`Select` }}
-      </Button>
-      <div
-        v-if="
-          isSelectionMode && schemaName === 'Item' && selectedItems.length > 0
-        "
-        class="relative"
-      >
-        <Button class="w-40" @click="toggleDropdown"> Create </Button>
-        <div
-          v-if="showDropdown"
-          class="
-            absolute
-            top-full
-            mt-1
-            bg-white
-            border border-gray-300
-            rounded
-            shadow-lg
-            z-10
-            w-40
-          "
-        >
-          <div
-            v-for="option in actionOptions"
-            :key="option.value"
-            class="px-4 py-2 hover:bg-gray-100 cursor-pointer text-sm"
-            @click="createInvoice(option.value)"
-          >
-            {{ option.label }}
-          </div>
-        </div>
-      </div>
-      <Button ref="exportButton" :icon="false" @click="openExportModal = true">
-        {{ t`Export` }}
-      </Button>
-      <FilterDropdown
-        ref="filterDropdown"
-        :schema-name="schemaName"
-        @change="applyFilter"
-      />
+    <PageHeader :title="title" />
+
+    <!-- Secondary header (toolbar) -->
+    <div
+      class="
+        px-4
+        py-2
+        flex
+        items-center
+        gap-2
+        surface-bg
+        border-b
+        app-border
+        header-elevated
+        flex-shrink-0
+      "
+    >
       <Button
         v-if="canCreate"
         ref="makeNewDocButton"
         :icon="true"
         type="primary"
         :padding="false"
-        class="px-3"
+        class="px-3 rounded-xl"
         @click="handleMakeNewDoc"
       >
         <feather-icon name="plus" class="w-4 h-4" />
       </Button>
-    </PageHeader>
+
+      <FilterDropdown
+        ref="filterDropdown"
+        :schema-name="schemaName"
+        @change="applyFilter"
+      />
+
+      <div class="relative flex items-center min-w-48 max-w-64">
+        <feather-icon
+          name="search"
+          class="absolute left-2.5 w-4 h-4 text-gray-500 dark:text-gray-400 pointer-events-none"
+        />
+        <input
+          v-model="searchQuery"
+          type="search"
+          :placeholder="t`Search...`"
+          class="
+            w-full
+            pl-8
+            pr-3
+            py-1.5
+            rounded-xl
+            border
+            app-border
+            bg-gray-50
+            dark:bg-gray-890
+            text-sm
+            text-gray-900
+            dark:text-gray-100
+            placeholder-gray-500
+            dark:placeholder-gray-400
+            focus:outline-none
+            focus:ring-1
+            focus:ring-primary
+          "
+        />
+      </div>
+
+      <Button ref="exportButton" :icon="false" class="rounded-xl" @click="openExportModal = true">
+        {{ t`Export` }}
+      </Button>
+
+      <Button
+        v-if="
+          schemaName === 'Item' &&
+          (!isSelectionMode || (isSelectionMode && selectedItems.length === 0))
+        "
+        class="rounded-xl"
+        @click="toggleSelectionMode"
+      >
+        {{ t`Select` }}
+      </Button>
+
+      <div
+        v-if="isSelectionMode && schemaName === 'Item' && selectedItems.length > 0"
+        class="relative"
+      >
+        <Button class="w-40 rounded-xl" @click="toggleDropdown"> Create </Button>
+        <div
+          v-if="showDropdown"
+          class="
+            absolute
+            top-full
+            mt-2
+            bg-white
+            dark:bg-gray-890
+            border
+            app-border
+            rounded-xl
+            shadow-md
+            z-10
+            w-44
+            overflow-hidden
+          "
+        >
+          <div
+            v-for="option in actionOptions"
+            :key="option.value"
+            class="
+              px-4
+              py-2
+              hover:bg-gray-50
+              dark:hover:bg-gray-900
+              cursor-pointer
+              text-sm
+              text-gray-800
+              dark:text-gray-200
+            "
+            @click="createInvoice(option.value)"
+          >
+            {{ option.label }}
+          </div>
+        </div>
+      </div>
+
+      <div class="ms-auto"></div>
+    </div>
     <List
       ref="list"
       :schema-name="schemaName"
       :list-config="listConfig"
       :filters="filters"
+      :search-query="searchQuery"
       :can-create="canCreate"
       :is-selection-mode="isSelectionMode"
       class="flex-1 flex h-full"
@@ -105,6 +170,8 @@ import { defineComponent, inject, ref } from 'vue';
 import List from './List.vue';
 import { Money } from 'pesa';
 import { ModelNameEnum } from 'models/types';
+import { hasPermission } from 'src/utils/authService';
+import { getWritePermissionForSchema } from 'src/utils/permissions';
 
 export default defineComponent({
   name: 'ListView',
@@ -138,6 +205,7 @@ export default defineComponent({
       isSelectionMode: false,
       showDropdown: false,
       selectedItems: [] as string[],
+      searchQuery: '',
     } as {
       listConfig: undefined | ReturnType<typeof getListConfig>;
       openExportModal: boolean;
@@ -145,6 +213,7 @@ export default defineComponent({
       isSelectionMode: boolean;
       showDropdown: boolean;
       selectedItems: string[];
+      searchQuery: string;
     };
   },
   computed: {
@@ -162,7 +231,10 @@ export default defineComponent({
       return fyo.schemaMap[this.schemaName]?.fields ?? [];
     },
     canCreate(): boolean {
-      return fyo.schemaMap[this.schemaName]?.create !== false;
+      if (fyo.schemaMap[this.schemaName]?.create === false) return false;
+      const writePerm = getWritePermissionForSchema(this.schemaName);
+      if (writePerm && !hasPermission(writePerm)) return false;
+      return true;
     },
     actionOptions(): { value: string; label: string }[] {
       return [

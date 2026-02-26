@@ -43,7 +43,7 @@
 
         <svg
           v-if="!isReadOnly && !canLink"
-          class="w-3 h-3"
+          class="w-4 h-4 flex-shrink-0"
           style="background: inherit; margin-right: -3px"
           viewBox="0 0 5 10"
           xmlns="http://www.w3.org/2000/svg"
@@ -77,7 +77,7 @@
             @click.stop.prevent="clearValue"
             @mousedown.prevent
           >
-            <feather-icon name="x" class="w-3.5 h-3.5" />
+            <feather-icon name="x" class="w-4 h-4 flex-shrink-0" />
           </button>
           <button
             class="p-0.5 rounded -me1 bg-transparent"
@@ -93,7 +93,7 @@
               <template #target>
                 <feather-icon
                   name="chevron-right"
-                  class="w-4 h-4 text-gray-600 dark:text-gray-400"
+                  class="w-5 h-5 text-gray-600 dark:text-gray-400 flex-shrink-0"
                 />
               </template>
               <template #content>
@@ -130,6 +130,7 @@ export default {
       showQuickView: false,
       linkValue: '',
       focInp: false,
+      didEditInput: false,
       isLoading: false,
       suggestions: [],
       highlightedIndex: -1,
@@ -290,6 +291,7 @@ export default {
     },
     onInputFocus(e) {
       this.isFocused = true;
+      this.didEditInput = false;
     },
     onClick(e, toggleDropdown) {
       if (this.isFocused) {
@@ -310,34 +312,58 @@ export default {
       this.isFocused = false;
       this.isDropdownOpen = false;
       if (!label && !this.value) {
+        this.didEditInput = false;
         return;
       }
       if (!label) {
+        // Never clear an existing committed value on blur. Focus movement to
+        // Save/confirm can transiently produce empty label.
+        if (this.value) {
+          this.setLinkValue(this.value);
+          this.didEditInput = false;
+          return;
+        }
         this.triggerChange('');
+        this.setLinkValue('', true);
+        this.didEditInput = false;
         return;
       }
 
-      if (this.suggestions.length === 0) {
-        this.triggerChange(label);
+      const localSuggestion = this.suggestions.find((s) => s.label === label);
+      if (localSuggestion && !localSuggestion.actionOnly) {
+        this.setSuggestion(localSuggestion);
+        this.didEditInput = false;
         return;
       }
 
-      const suggestion = this.suggestions.find((s) => s.label === label);
-      if (suggestion) {
-        this.setSuggestion(suggestion);
-      } else {
-        const suggestions = await this.getSuggestions(label);
-        this.setSuggestion(suggestions[0]);
+      const suggestions = await this.getSuggestions(label);
+      const first = suggestions.find((s) => !s.actionOnly);
+      if (first) {
+        this.setSuggestion(first);
+        this.didEditInput = false;
+        return;
       }
+
+      // No valid match: keep previous value if present, otherwise clear only
+      // when user actually edited this input.
+      if (this.value) {
+        this.setLinkValue(this.value);
+      } else if (this.didEditInput) {
+        this.triggerChange('');
+        this.setLinkValue('', true);
+      }
+      this.didEditInput = false;
     },
 
     onInput(e, toggleDropdown) {
       if (this.isReadOnly) {
         return;
       }
+      this.didEditInput = true;
 
       if (!e.target.value || this.focInp) {
         e.target.value = null;
+        this.setLinkValue('', true);
         this.focInp = false;
         toggleDropdown(false);
         return;

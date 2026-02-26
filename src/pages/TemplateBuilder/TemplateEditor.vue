@@ -17,7 +17,7 @@ import { EditorView, ViewUpdate } from '@codemirror/view';
 import { tags } from '@lezer/highlight';
 import { basicSetup } from 'codemirror';
 import { uicolors } from 'src/utils/colors';
-import { defineComponent, markRaw } from 'vue';
+import { defineComponent } from 'vue';
 
 export default defineComponent({
   props: {
@@ -88,10 +88,11 @@ export default defineComponent({
         ],
         parent: this.container,
       });
-      this.view = markRaw(view);
+      // EditorView is not reactive-friendly; keep typing loose here.
+      this.view = view as any;
 
       const compartments = { readOnly, editable };
-      this.compartments = markRaw(compartments);
+      this.compartments = compartments;
     },
     updateListener(update: ViewUpdate) {
       if (update.docChanged) {

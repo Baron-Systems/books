@@ -42,6 +42,11 @@ export default {
       }
 
       const value = newValue ?? this.value;
+      if (!value) {
+        this.linkValue = '';
+        return;
+      }
+
       const { fieldname, target } = this.df ?? {};
       const linkDisplayField = fyo.schemaMap[target ?? '']?.linkDisplayField;
       if (!linkDisplayField) {
@@ -213,6 +218,61 @@ export default {
       } catch {
         return null;
       }
+    },
+    onInput(e, toggleDropdown) {
+      if (this.isReadOnly) {
+        return;
+      }
+      this.didEditInput = true;
+
+      if (!e.target.value || this.focInp) {
+        this.focInp = false;
+        this.setLinkValue('', true);
+        toggleDropdown(false);
+        return;
+      }
+
+      this.setLinkValue(e.target.value, true);
+      this.updateSuggestions(e.target.value);
+    },
+    async onBlur(label, toggleDropdown) {
+      this.isFocused = false;
+      this.isDropdownOpen = false;
+      if (!label && !this.value) {
+        this.didEditInput = false;
+        return;
+      }
+      // Do not clear an existing value when blur fires with empty label (e.g. focus
+      // moved to Save button/dialog). Restore display and keep doc value so save
+      // does not wipe the field.
+      if (!label && this.value) {
+        this.setLinkValue(this.value);
+        this.didEditInput = false;
+        return;
+      }
+      if (!label) {
+        this.triggerChange('');
+        this.didEditInput = false;
+        return;
+      }
+
+      const localSuggestion = this.suggestions.find((s) => s.label === label);
+      if (localSuggestion && !localSuggestion.actionOnly) {
+        this.setSuggestion(localSuggestion);
+        this.didEditInput = false;
+        return;
+      }
+
+      const suggestions = await this.getSuggestions(label);
+      const first = suggestions.find((s) => !s.actionOnly);
+      if (first && !first.actionOnly) {
+        this.setSuggestion(first);
+      } else if (this.value) {
+        this.setLinkValue(this.value);
+      } else {
+        this.triggerChange('');
+      }
+      this.didEditInput = false;
     },
   },
 };

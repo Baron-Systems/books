@@ -45,12 +45,32 @@ export async function sendError(errorLogObj: ErrorLog) {
   await ipc.sendError(JSON.stringify(body));
 }
 
+function getErrorText(errorLogObj: ErrorLog): string {
+  const parts = [
+    errorLogObj.name ?? 'Error',
+    errorLogObj.message ?? '',
+    errorLogObj.stack ?? '',
+  ].filter(Boolean);
+  return parts.join('\n\n');
+}
+
 function getToastProps(errorLogObj: ErrorLog) {
+  const message =
+    (errorLogObj.name && errorLogObj.message
+      ? `${errorLogObj.name}: ${errorLogObj.message}`
+      : errorLogObj.message || errorLogObj.name || t`Error`) ?? t`Error`;
+
   const props: ToastOptions = {
-    message: errorLogObj.name ?? t`Error`,
+    message,
     type: 'error',
-    actionText: t`Report Error`,
-    action: () => reportIssue(errorLogObj),
+    actionText: t`Copy`,
+    action: async () => {
+      try {
+        await navigator.clipboard.writeText(getErrorText(errorLogObj));
+      } catch {
+        // ignore clipboard errors
+      }
+    },
   };
 
   return props;
@@ -195,12 +215,16 @@ export function getErrorHandledSync<T extends (...args: any[]) => any>(
 
 function getFeatureFlags(): string[] {
   const getBooleanFields = (docName: string) => {
-    const doc = fyo.singles[docName];
+    const doc = fyo.singles[docName] as unknown;
+
+    if (!doc || typeof doc !== 'object') {
+      return {} as Record<string, boolean>;
+    }
+
+    const fieldsArray = fyo.schemaMap[docName]?.fields ?? [];
+    const fieldsMap = new Map(fieldsArray.map((f) => [f.fieldname, f]));
 
     return Object.entries(doc as Doc).reduce((acc, [key, value]) => {
-      const fieldsArray = fyo.schemaMap[docName]?.fields ?? [];
-      const fieldsMap = new Map(fieldsArray.map((f) => [f.fieldname, f]));
-
       const field = fieldsMap.get(key);
       if (
         typeof value === 'boolean' &&

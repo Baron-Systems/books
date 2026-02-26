@@ -48,6 +48,9 @@ export function getUrlAndTokenString(): Creds {
 
 export async function sendError(body: string, main: Main) {
   const { errorLogUrl, tokenString } = getUrlAndTokenString();
+  if (!errorLogUrl || !tokenString) {
+    return;
+  }
   const headers = {
     Authorization: tokenString,
     Accept: 'application/json',

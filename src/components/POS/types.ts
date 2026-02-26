@@ -33,6 +33,7 @@ export type PosEmits =
   | 'toggleView'
   | 'toggleModal'
   | 'setItemGroup'
+  | 'registerOnly'
   | 'setPaidAmount'
   | 'setPaymentMethod'
   | 'setCouponsCount'

@@ -45,7 +45,8 @@
             </div>
           </div>
           <div class="mt-1 text-sm text-gray-600 dark:text-gray-400">
-            {{ 'الأيام المتبقية:' }} <span class="font-semibold">{{ daysRemaining }}</span>
+            {{ 'الوقت المتبقي:' }}
+            <span class="font-semibold">{{ remainingCountdown }}</span>
           </div>
         </div>
 
@@ -125,7 +126,9 @@ import { docsPathRef } from 'src/utils/refs';
 import { UIGroupedFields } from 'src/utils/types';
 import { computed, defineComponent, inject } from 'vue';
 import CommonFormSection from '../CommonForm/CommonFormSection.vue';
-import { applyThemeSettings } from 'src/utils/theme';
+import { applyThemeSettings, type ThemeSettingsLike } from 'src/utils/theme';
+import { requirePermission } from 'src/utils/authService';
+import { PERMISSIONS } from 'src/utils/permissions';
 
 const COMPONENT_NAME = 'Settings';
 
@@ -145,10 +148,14 @@ export default defineComponent({
       errors: {},
       activeTab: ModelNameEnum.AccountingSettings,
       groupedFields: null,
+      nowTs: Date.now(),
+      _ticker: null as null | number,
     } as {
       errors: Record<string, string>;
       activeTab: string;
       groupedFields: null | UIGroupedFields;
+      nowTs: number;
+      _ticker: null | number;
     };
   },
   computed: {
@@ -163,16 +170,30 @@ export default defineComponent({
       if (!v) return false;
       const ts = Date.parse(v);
       if (Number.isNaN(ts)) return false;
-      return Date.now() < ts;
+      return this.nowTs < ts;
     },
-    daysRemaining(): number {
+    remainingMs(): number {
       const v = this.activationExpiresAt;
       if (!v) return 0;
       const ts = Date.parse(v);
       if (Number.isNaN(ts)) return 0;
-      const ms = ts - Date.now();
-      const days = Math.ceil(ms / (24 * 60 * 60 * 1000));
-      return days > 0 ? days : 0;
+      const ms = ts - this.nowTs;
+      return ms > 0 ? ms : 0;
+    },
+    remainingCountdown(): string {
+      if (!this.isActivated) {
+        return '—';
+      }
+      const ms = this.remainingMs;
+      const totalSeconds = Math.floor(ms / 1000);
+      const days = Math.floor(totalSeconds / (24 * 3600));
+      const hours = Math.floor((totalSeconds % (24 * 3600)) / 3600);
+      const minutes = Math.floor((totalSeconds % 3600) / 60);
+      const seconds = totalSeconds % 60;
+      const pad2 = (n: number) => String(n).padStart(2, '0');
+      const time = `${pad2(hours)}:${pad2(minutes)}:${pad2(seconds)}`;
+      if (days <= 0) return time;
+      return `${days} يوم ${time}`;
     },
     canSave() {
       return [
@@ -236,8 +257,8 @@ export default defineComponent({
 
           return true;
         })
-        .map((s) => this.fyo?.schemaMap?.[s]!)
-        .filter(Boolean);
+        .map((s) => this.fyo?.schemaMap?.[s])
+        .filter((schema): schema is Schema => Boolean(schema));
     },
     activeGroup(): Map<string, Field[]> {
       if (!this.groupedFields) {
@@ -261,6 +282,7 @@ export default defineComponent({
     }
 
     this.update();
+    this.startTicker();
   },
   activated(): void {
     const tab = this.$route.query.tab;
@@ -269,6 +291,7 @@ export default defineComponent({
     }
 
     docsPathRef.value = docsPathMap.Settings ?? '';
+    this.startTicker();
     this.shortcuts?.pmod.set(COMPONENT_NAME, ['KeyS'], async () => {
       if (!this.canSave) {
         return;
@@ -279,6 +302,7 @@ export default defineComponent({
   },
   async deactivated(): Promise<void> {
     docsPathRef.value = '';
+    this.stopTicker();
     this.shortcuts?.delete(COMPONENT_NAME);
     if (!this.canSave) {
       return;
@@ -286,6 +310,19 @@ export default defineComponent({
     await this.reset();
   },
   methods: {
+    startTicker() {
+      this.stopTicker();
+      this.nowTs = Date.now();
+      this._ticker = window.setInterval(() => {
+        this.nowTs = Date.now();
+      }, 1000);
+    },
+    stopTicker() {
+      if (typeof this._ticker === 'number') {
+        window.clearInterval(this._ticker);
+      }
+      this._ticker = null;
+    },
     async reset() {
       const resetableDocs = this.schemas
         .map(({ name }) => this.fyo?.singles?.[name])
@@ -301,6 +338,19 @@ export default defineComponent({
       const syncableDocs = this.schemas
         .map(({ name }) => this.fyo?.singles?.[name])
         .filter((doc) => doc?.canSave) as Doc[];
+
+      try {
+        requirePermission(PERMISSIONS.SETTINGS_EDIT);
+      } catch (error) {
+        if (error instanceof Error) {
+          await showDialog({
+            title: this.t`Cannot Save Settings`,
+            detail: error.message,
+            type: 'error',
+          });
+        }
+        return;
+      }
 
       for (const doc of syncableDocs) {
         await this.syncDoc(doc);
@@ -350,9 +400,9 @@ export default defineComponent({
       // Live Apply theme settings (System -> Theme Settings)
       if (this.activeTab === ModelNameEnum.SystemSettings) {
         const doc = this.doc as unknown as Record<string, unknown> | null;
-        const liveApply = !!(doc as any)?.liveApplyTheme;
+        const liveApply = !!doc?.['liveApplyTheme'];
         if (liveApply && (field.section === 'Theme Settings' || field.section === 'Theme')) {
-          applyThemeSettings(doc as any);
+          applyThemeSettings(doc as unknown as ThemeSettingsLike);
         }
       }
 

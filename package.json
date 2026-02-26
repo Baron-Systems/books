@@ -1,17 +1,17 @@
 {
-  "name": "frappe-books",
+  "name": "baron-accounting",
   "version": "0.36.0",
-  "description": "Simple book-keeping app for everyone",
+  "description": "Baron Accounting - برنامج محاسبة بسيط للجميع",
   "author": {
-    "name": "Frappe Technologies Pvt. Ltd.",
-    "email": "hello@frappe.io"
+    "name": "Baron Accounting",
+    "email": "info@baronaccounting.com"
   },
   "scripts": {
     "dev": "node build/scripts/dev.mjs",
     "build": "node build/scripts/build.mjs",
     "release": "scripts/publish-mac-arm.sh",
-    "postinstall": "electron-rebuild",
-    "postuninstall": "electron-rebuild",
+    "postinstall": "node ./node_modules/@electron/rebuild/lib/cli.js -f -w better-sqlite3",
+    "postuninstall": "node ./node_modules/@electron/rebuild/lib/cli.js -f -w better-sqlite3",
     "script:translate": "scripts/runner.sh scripts/generateTranslations.ts",
     "script:profile": "scripts/profile.sh",
     "test": "scripts/test.sh",
@@ -23,6 +23,7 @@
     "@codemirror/autocomplete": "^6.4.2",
     "@codemirror/lang-vue": "^0.1.1",
     "@popperjs/core": "^2.10.2",
+    "bcryptjs": "^2.4.3",
     "better-sqlite3": "^9.2.2",
     "bree": "^9.2.4",
     "codemirror": "^6.0.1",
@@ -45,6 +46,7 @@
     "@electron/rebuild": "^3.4.1",
     "@lezer/common": "^1.0.0",
     "@types/assert": "^1.5.6",
+    "@types/bcryptjs": "^3.0.0",
     "@types/better-sqlite3": "^7.6.4",
     "@types/electron-devtools-installer": "^2.2.0",
     "@types/lodash": "^4.14.179",
@@ -71,7 +73,7 @@
     "playwright": "^1.55.1",
     "postcss": "^8",
     "prettier": "^2.4.1",
-    "tailwindcss": "npm:@tailwindcss/postcss7-compat",
+    "tailwindcss": "npm:@tailwindcss/postcss7-compat@2.2.17",
     "tailwindcss-rtl": "^0.9.0",
     "tap-spec": "^5.0.0",
     "tape": "^5.6.1",

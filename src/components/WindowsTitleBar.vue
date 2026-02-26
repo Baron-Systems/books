@@ -1,21 +1,22 @@
 <template>
   <div
+    dir="ltr"
     class="
       relative
       window-drag
+      box-border
       flex
       items-center
-      border-b
+      border
+      border-white
       dark:bg-gray-900
       text-gray-900
       dark:text-gray-100
-      border-gray-100
-      dark:border-gray-800
     "
     style="height: 28px"
   >
     <Fb class="ms-2" />
-    <p v-if="companyName && dbPath" class="mx-auto text-sm">
+    <p v-if="companyName && dbPath" class="mx-auto text-sm" dir="auto">
       {{ companyName }} - {{ dbPath }}
     </p>
     <div

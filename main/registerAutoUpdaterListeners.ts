@@ -2,7 +2,7 @@ import { app, dialog } from 'electron';
 import { autoUpdater, UpdateInfo } from 'electron-updater';
 import { emitMainProcessError } from '../backend/helpers';
 import { Main } from '../main';
-import { isNetworkError } from './helpers';
+import { isNetworkError, isUpdateCheckIgnorableError } from './helpers';
 
 export default function registerAutoUpdaterListeners(main: Main) {
   autoUpdater.autoDownload = false;
@@ -14,7 +14,7 @@ export default function registerAutoUpdaterListeners(main: Main) {
       main.checkedForUpdate = true;
     }
 
-    if (isNetworkError(error)) {
+    if (isNetworkError(error) || isUpdateCheckIgnorableError(error)) {
       return;
     }
 
@@ -52,7 +52,7 @@ export default function registerAutoUpdaterListeners(main: Main) {
     const option = await dialog.showMessageBox({
       type: 'info',
       title: 'Update Downloaded',
-      message: 'Restart Frappe Books to install update?',
+      message: 'Restart Baron Accounting to install update?',
       buttons: ['Yes', 'No'],
     });
 

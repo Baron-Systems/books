@@ -69,6 +69,14 @@
       "section": "Number Series"
     },
     {
+      "fieldname": "partySettlementNumberSeries",
+      "label": "Party Settlement Number Series",
+      "fieldtype": "Link",
+      "target": "NumberSeries",
+      "create": true,
+      "section": "Number Series"
+    },
+    {
       "fieldname": "stockMovementNumberSeries",
       "label": "Stock Movement Number Series",
       "fieldtype": "Link",
@@ -200,6 +208,37 @@
       "target": "Party",
       "create": true,
       "section": "Point of Sale"
+    },
+    {
+      "fieldname": "salesPriceList",
+      "label": "Default Sales Price List",
+      "fieldtype": "Link",
+      "target": "PriceList",
+      "create": true,
+      "section": "Price Lists"
+    },
+    {
+      "fieldname": "purchasePriceList",
+      "label": "Default Purchase Price List",
+      "fieldtype": "Link",
+      "target": "PriceList",
+      "create": true,
+      "section": "Price Lists"
+    },
+    {
+      "fieldname": "posPriceList",
+      "label": "Default POS Price List",
+      "fieldtype": "Link",
+      "target": "PriceList",
+      "create": true,
+      "section": "Price Lists"
+    },
+    {
+      "fieldname": "preventSellBelowCost",
+      "label": "Prevent Selling Below Cost",
+      "fieldtype": "Check",
+      "default": true,
+      "section": "Price Lists"
     },
     {
       "fieldname": "posCashDenominations",

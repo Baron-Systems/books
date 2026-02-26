@@ -8,7 +8,6 @@ import {
   DEFAULT_CURRENCY,
   DEFAULT_DATE_FORMAT,
   DEFAULT_DISPLAY_PRECISION,
-  DEFAULT_LOCALE,
 } from './consts';
 
 export function format(
@@ -159,18 +158,18 @@ function formatNumber(value: unknown, fyo: Fyo): string {
   return formattedNumber;
 }
 
+const NUMBER_FORMAT_LOCALE = 'en';
+
 function getNumberFormatter(fyo: Fyo) {
   if (fyo.currencyFormatter) {
     return fyo.currencyFormatter;
   }
 
-  const locale =
-    (fyo.singles.SystemSettings?.locale as string) ?? DEFAULT_LOCALE;
   const display =
     (fyo.singles.SystemSettings?.displayPrecision as number) ??
     DEFAULT_DISPLAY_PRECISION;
 
-  return (fyo.currencyFormatter = Intl.NumberFormat(locale, {
+  return (fyo.currencyFormatter = Intl.NumberFormat(NUMBER_FORMAT_LOCALE, {
     style: 'decimal',
     minimumFractionDigits: display,
   }));

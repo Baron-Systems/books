@@ -1,52 +1,55 @@
 <template>
-  <div class="flex">
-    <SearchBar />
-    <!-- Back Button -->
-    <a
-      ref="backlink"
-      class="
-        nav-link
-        border-l border-r border-white
-        dark:border-gray-850 dark:bg-gray-900
-      "
-      :class="
-        historyState.back
-          ? 'text-gray-700 dark:text-gray-300 cursor-pointer'
-          : 'text-gray-400 dark:text-gray-700'
-      "
-      @click="$router.back()"
-    >
-      <feather-icon :name="backIcon" class="w-4 h-4" />
-    </a>
-    <!-- Forward Button -->
-    <a
-      class="nav-link rounded-md rounded-l-none dark:bg-gray-900"
-      :class="
-        historyState.forward
-          ? 'text-gray-700 dark:text-gray-400 cursor-pointer'
-          : 'text-gray-400 dark:text-gray-700'
-      "
-      @click="$router.forward()"
-    >
-      <feather-icon :name="forwardIcon" class="w-4 h-4" />
-    </a>
+  <div class="flex items-center gap-2">
+    <!-- Back / Forward -->
+    <div class="flex items-center gap-2">
+      <button
+        ref="backlink"
+        class="
+          window-no-drag
+          btn-primary
+          flex-center
+          h-8
+          rounded-md
+          px-4
+          w-auto
+        "
+        :disabled="!historyState.back"
+        @click="$router.back()"
+      >
+        <feather-icon :name="backIcon" class="w-4 h-4" />
+      </button>
+      <button
+        class="
+          window-no-drag
+          btn-primary
+          flex-center
+          h-8
+          rounded-md
+          px-4
+          w-auto
+        "
+        :disabled="!historyState.forward"
+        @click="$router.forward()"
+      >
+        <feather-icon :name="forwardIcon" class="w-4 h-4" />
+      </button>
+    </div>
   </div>
 </template>
 <script lang="ts">
 import { languageDirectionKey, shortcutsKey } from 'src/utils/injectionKeys';
 import { ref, inject } from 'vue';
 import { defineComponent } from 'vue';
-import SearchBar from './SearchBar.vue';
 import { historyState } from 'src/utils/refs';
 
 const COMPONENT_NAME = 'PageHeaderNavGroup';
 
 export default defineComponent({
-  components: { SearchBar },
+  components: {},
   setup() {
     return {
       historyState,
-      backlink: ref<HTMLAnchorElement | null>(null),
+      backlink: ref<HTMLButtonElement | null>(null),
       shortcuts: inject(shortcutsKey),
       languageDirection: inject(languageDirectionKey),
     };
@@ -77,9 +80,3 @@ export default defineComponent({
   },
 });
 </script>
-
-<style scoped>
-.nav-link {
-  @apply flex items-center bg-gray-200 px-3;
-}
-</style>

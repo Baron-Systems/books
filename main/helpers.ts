@@ -50,23 +50,94 @@ export async function getConfigFilesWithModified(files: ConfigFile[]) {
   return filesWithModified;
 }
 
+const FALLBACK_IPC_ERROR: BackendResponse = {
+  error: {
+    name: 'Error',
+    message: 'An error occurred while handling the request.',
+  },
+};
+
 export async function getErrorHandledReponse(
   func: () => Promise<unknown> | unknown
-) {
-  const response: BackendResponse = {};
-
+): Promise<BackendResponse> {
   try {
-    response.data = await func();
-  } catch (err) {
-    response.error = {
-      name: (err as NodeJS.ErrnoException).name,
-      message: (err as NodeJS.ErrnoException).message,
-      stack: (err as NodeJS.ErrnoException).stack,
-      code: (err as NodeJS.ErrnoException).code,
+    const response: BackendResponse = {};
+
+    try {
+      response.data = await func();
+    } catch (err) {
+      response.error = serializeError(err);
+    }
+
+    try {
+      return ensureSerializableResponse(response);
+    } catch {
+      return { error: serializeError(new Error('Response could not be serialized for IPC')) };
+    }
+  } catch {
+    return FALLBACK_IPC_ERROR;
+  }
+}
+
+/**
+ * Ensure the response can be safely sent over IPC (structured clone).
+ * Prevents "An unknown exception occurred in the isolated context" when
+ * response.data contains non-serializable values (e.g. from native modules).
+ */
+function ensureSerializableResponse(response: BackendResponse): BackendResponse {
+  try {
+    const json = JSON.stringify(response);
+    return JSON.parse(json) as BackendResponse;
+  } catch {
+    return {
+      error: {
+        name: 'Error',
+        message: 'Response could not be serialized for IPC',
+      },
     };
   }
+}
 
-  return response;
+/**
+ * Safely serialize any thrown value to a plain object for IPC.
+ * Native/addon errors or non-Error throws can cause "An unknown exception
+ * occurred in the isolated context" in Electron if not normalized.
+ */
+function serializeError(err: unknown): {
+  name: string;
+  message: string;
+  stack?: string;
+  code?: string;
+} {
+  let fallbackMessage = 'Unknown error';
+  try {
+    if (err != null) {
+      fallbackMessage = typeof err === 'string' ? err : String(err);
+    }
+  } catch {
+    // ignore if String(err) or property access throws
+  }
+
+  const fallback = {
+    name: 'Error',
+    message: fallbackMessage,
+  };
+
+  if (err == null || typeof err !== 'object') {
+    return fallback;
+  }
+
+  try {
+    const e = err as NodeJS.ErrnoException & Error;
+    return {
+      name: typeof e.name === 'string' ? e.name : fallback.name,
+      message: typeof e.message === 'string' ? e.message : fallback.message,
+      stack: typeof e.stack === 'string' ? e.stack : undefined,
+      code: typeof e.code === 'string' ? e.code : undefined,
+    };
+  } catch {
+    return fallback;
+  }
 }
 
 export function rendererLog(main: Main, ...args: unknown[]) {
@@ -87,4 +158,14 @@ export function isNetworkError(error: Error) {
     default:
       return false;
   }
+}
+
+/** True when the update server returned 404 / no channel (e.g. placeholder app-update.yml). Don't show to user. */
+export function isUpdateCheckIgnorableError(error: Error): boolean {
+  const msg = error?.message ?? '';
+  if (msg.includes('404') || msg.includes('Cannot find channel') || msg.includes('latest.yml')) {
+    return true;
+  }
+  const err = error as Error & { response?: { statusCode?: number } };
+  return err?.response?.statusCode === 404;
 }

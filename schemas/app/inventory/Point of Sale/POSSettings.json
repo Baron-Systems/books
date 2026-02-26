@@ -83,6 +83,14 @@
       "section": "Barcode"
     },
     {
+      "fieldname": "barcodePrefix",
+      "label": "Barcode Prefix (e.g. 21 or 02)",
+      "fieldtype": "Data",
+      "default": "21",
+      "section": "Barcode",
+      "description": "Prefix for scale barcode (e.g. 21 for type-7 / RLS, 02 for EAN-13). Leave empty to use Check Digits number."
+    },
+    {
       "fieldname": "checkDigits",
       "label": "Check Digits",
       "fieldtype": "Int",
@@ -93,14 +101,14 @@
       "fieldname": "itemCodeDigits",
       "label": "Item Code Digits",
       "fieldtype": "Int",
-      "default": 0,
+      "default": 5,
       "section": "Barcode"
     },
     {
       "fieldname": "itemWeightDigits",
       "label": "item Weight Digits",
       "fieldtype": "Int",
-      "default": 0,
+      "default": 5,
       "section": "Barcode"
     },
     {

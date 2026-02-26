@@ -1,19 +1,23 @@
 <template>
-  <Modal class="w-2/6 ml-auto mr-3.5" :set-close-listener="false">
+  <Modal
+    class="w-2/6 ml-auto mr-3.5"
+    :set-close-listener="false"
+    :open-modal="openModal && !!sinvDoc?.fieldMap"
+  >
     <div v-if="sinvDoc.fieldMap" class="px-4 py-6 grid" style="height: 95vh">
       <Currency
         :df="fyo.fieldMap.PaymentFor.amount"
-        :read-only="!transferAmount.isZero()"
+        :read-only="true"
         :border="true"
         :text-right="true"
         :value="paidAmount"
-        @change="(amount:Money)=>  $emit('setPaidAmount', (amount as Money).float)"
       />
       <div class="grid grid-cols-2 gap-6">
         <Button
           v-for="method in paymentMethods"
           :key="method"
-          class="w-full py-5 bg-teal-500"
+          type="primary"
+          class="w-full py-5"
           @click="setPaymentMethodAndAmount(method)"
         >
           <slot>
@@ -142,34 +146,47 @@
       </div>
 
       <div class="grid grid-cols-2 gap-4 bottom-8">
-        <div class="col-span-1">
-          <Button
-            class="w-full"
-            :style="{
-              backgroundColor: fyo.singles.Defaults?.submitButtonColour,
-            }"
-            style="padding: 1.35rem"
-            @click="submitTransaction"
-          >
-            <slot>
-              <p class="uppercase text-lg text-white font-semibold">
-                {{ t`Submit` }}
-              </p>
-            </slot>
-          </Button>
-        </div>
+        <template v-if="!openedForPay">
+          <div class="col-span-1">
+            <Button
+              type="primary"
+              class="w-full"
+              style="padding: 1.35rem"
+              @click="registerTransaction"
+            >
+              <slot>
+                <p class="uppercase text-lg text-white font-semibold">
+                  {{ t`Register` }}
+                </p>
+              </slot>
+            </Button>
+          </div>
+
+          <div class="col-span-1">
+            <Button
+              type="primary"
+              class="w-full"
+              style="padding: 1.35rem"
+              @click="registerAndPrintTransaction"
+            >
+              <slot>
+                <p class="uppercase text-lg text-white font-semibold">
+                  {{ t`Register & Print` }}
+                </p>
+              </slot>
+            </Button>
+          </div>
+        </template>
 
         <div class="col-span-1">
           <Button
+            type="secondary"
             class="w-full"
-            :style="{
-              backgroundColor: fyo.singles.Defaults?.cancelButtonColour,
-            }"
             style="padding: 1.35rem"
             @click="cancelTransaction"
           >
             <slot>
-              <p class="uppercase text-lg text-white font-semibold">
+              <p class="uppercase text-lg font-semibold">
                 {{ t`Cancel` }}
               </p>
             </slot>
@@ -178,8 +195,8 @@
 
         <div class="col-span-1">
           <Button
+            type="primary"
             class="w-full"
-            :style="{ backgroundColor: fyo.singles.Defaults?.payButtonColour }"
             style="padding: 1.35rem"
             @click="payTransaction"
           >
@@ -193,10 +210,8 @@
 
         <div class="col-span-1">
           <Button
+            type="primary"
             class="w-full"
-            :style="{
-              backgroundColor: fyo.singles.Defaults?.payAndPrintButtonColour,
-            }"
             style="padding: 1.35rem"
             @click="payAndPrintTransaction"
           >
@@ -234,6 +249,16 @@ export default defineComponent({
     Button,
     Data,
     Date,
+  },
+  props: {
+    openModal: {
+      type: Boolean,
+      default: false,
+    },
+    openedForPay: {
+      type: Boolean,
+      default: false,
+    },
   },
   emits: [
     'createTransaction',
@@ -349,16 +374,27 @@ export default defineComponent({
         })) as { name: string }[]
       ).map((d) => d.name);
     },
-    submitTransaction() {
-      if (!this.paymentMethod) {
+    registerTransaction() {
+      const hasPaidAmount = !this.paidAmount.isZero();
+      if (hasPaidAmount && !this.paymentMethod) {
         return showToast({
           type: 'error',
           message: this.fyo
-            .t`Please select a payment method before submitting.`,
+            .t`Please select a payment method when entering a payment amount.`,
         });
-        return;
       }
-      this.$emit('createTransaction');
+      this.$emit('createTransaction', false, true);
+    },
+    registerAndPrintTransaction() {
+      const hasPaidAmount = !this.paidAmount.isZero();
+      if (hasPaidAmount && !this.paymentMethod) {
+        return showToast({
+          type: 'error',
+          message: this.fyo
+            .t`Please select a payment method when entering a payment amount.`,
+        });
+      }
+      this.$emit('createTransaction', true, true);
     },
     payTransaction() {
       if (!this.paymentMethod) {

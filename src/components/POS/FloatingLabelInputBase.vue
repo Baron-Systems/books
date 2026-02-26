@@ -2,7 +2,10 @@
   <div class="relative">
     <input
       :type="inputType"
-      :class="[inputClasses, size === 'large' ? 'text-lg' : 'text-sm']"
+      :class="[
+        inputClasses,
+        size === 'large' ? 'text-lg pt-5' : 'text-sm pt-4',
+      ]"
       :value="value"
       :max="isNumeric(df) ? df.maxvalue : undefined"
       :min="isNumeric(df) ? df.minvalue : undefined"
@@ -13,7 +16,6 @@
         block
         px-2.5
         pb-2.5
-        pt-4
         w-full
         font-medium
         text-gray-900
@@ -30,26 +32,28 @@
     />
     <label
       for="floating_outlined"
-      :class="size === 'large' ? 'text-xl' : 'text-md'"
+      :class="size === 'large' ? 'text-sm' : 'text-xs'"
       class="
         absolute
         font-medium
         text-gray-500
+        dark:text-gray-400
         duration-300
         transform
-        -translate-y-4
-        scale-75
-        top-1
+        -translate-y-5
+        scale-100
+        top-0
         z-10
         origin-[0]
-        bg-white2
+        bg-gray-25
+        dark:bg-gray-850
         px-2
         peer-focus:px-2 peer-focus:text-blue-600 peer-focus:dark:text-blue-500
         peer-placeholder-shown:scale-100
         peer-placeholder-shown:-translate-y-1/2
         peer-placeholder-shown:top-1/2
-        peer-focus:top-2 peer-focus:scale-75 peer-focus:-translate-y-4
-        left-1
+        peer-focus:top-0 peer-focus:scale-100 peer-focus:-translate-y-5
+        start-1
       "
       >{{ df.label }}</label
     >

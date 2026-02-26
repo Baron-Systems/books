@@ -24,6 +24,11 @@
       :dark-mode="darkMode"
       @change-db-file="showDbSelector"
     />
+    <Login
+      v-if="activeScreen === 'Login'"
+      class="flex-1"
+      @logged-in="onLoggedIn"
+    />
     <DatabaseSelector
       v-if="activeScreen === 'DatabaseSelector'"
       ref="databaseSelector"
@@ -47,7 +52,7 @@
         </h2>
 
         <p v-if="licenseGate.mode === 'activate'" class="text-sm text-gray-600 dark:text-gray-400 mt-2">
-          أدخل مفتاح التفعيل وحدد عدد أيام التفعيل. عند انتهاء الأيام سيتم قفل البرنامج حتى يتم التفعيل مجددًا.
+          أدخل مفتاح التفعيل وحدد مدة التفعيل (أيام + ساعات). عند انتهاء الوقت سيتم قفل البرنامج حتى يتم التفعيل مجددًا.
         </p>
         <p v-else class="text-sm text-gray-600 dark:text-gray-400 mt-2">
           لا يمكن تغيير قاعدة البيانات بدون إدخال مفتاح التفعيل.
@@ -58,7 +63,7 @@
             <label class="text-sm text-gray-700 dark:text-gray-300">مفتاح التفعيل</label>
             <input
               v-model="licenseGate.key"
-              type="text"
+              type="password"
               class="
                 mt-1
                 w-full
@@ -73,15 +78,15 @@
                 font-mono
               "
               placeholder="XXXXX-XXXXX-XXXXX-XXXXX-XXXXX"
+              autocomplete="off"
             />
           </div>
 
           <div v-if="licenseGate.mode === 'activate'">
-            <label class="text-sm text-gray-700 dark:text-gray-300">عدد أيام التفعيل</label>
+            <label class="text-sm text-gray-700 dark:text-gray-300">كلمة المرور</label>
             <input
-              v-model.number="licenseGate.days"
-              type="number"
-              min="1"
+              v-model="licenseGate.password"
+              type="password"
               class="
                 mt-1
                 w-full
@@ -94,8 +99,57 @@
                 py-2
                 outline-none
               "
-              placeholder="30"
+              placeholder="أدخل كلمة المرور"
+              autocomplete="off"
             />
+          </div>
+
+          <div v-if="licenseGate.mode === 'activate'">
+            <div class="grid grid-cols-2 gap-3">
+              <div>
+                <label class="text-sm text-gray-700 dark:text-gray-300">عدد أيام التفعيل</label>
+                <input
+                  v-model.number="licenseGate.days"
+                  type="number"
+                  min="0"
+                  class="
+                    mt-1
+                    w-full
+                    bg-gray-100
+                    dark:bg-gray-875
+                    focus:bg-gray-200
+                    dark:focus:bg-gray-890
+                    rounded-md
+                    px-3
+                    py-2
+                    outline-none
+                  "
+                  placeholder="30"
+                />
+              </div>
+              <div>
+                <label class="text-sm text-gray-700 dark:text-gray-300">عدد الساعات</label>
+                <input
+                  v-model.number="licenseGate.hours"
+                  type="number"
+                  min="0"
+                  max="23"
+                  class="
+                    mt-1
+                    w-full
+                    bg-gray-100
+                    dark:bg-gray-875
+                    focus:bg-gray-200
+                    dark:focus:bg-gray-890
+                    rounded-md
+                    px-3
+                    py-2
+                    outline-none
+                  "
+                  placeholder="0"
+                />
+              </div>
+            </div>
           </div>
         </div>
 
@@ -149,31 +203,38 @@ import { Search } from './utils/search';
 import { Shortcuts } from './utils/shortcuts';
 import { routeTo } from './utils/ui';
 import { useKeys } from './utils/vueUtils';
-import { applyThemeSettings, setTheme } from 'src/utils/theme';
+import { applyThemeSettings, setTheme, type ThemeSettingsLike } from 'src/utils/theme';
+import { ensureDefaultAdminExists } from './utils/authService';
+import Login from './pages/Login.vue';
 import {
   registerInstanceToERPNext,
   updateERPNSyncSettings,
 } from './utils/erpnextSync';
 import { ERPNextSyncSettings } from 'models/baseModels/ERPNextSyncSettings/ERPNextSyncSettings';
+import { isLoggedIn } from './utils/authState';
 
 enum Screen {
   Desk = 'Desk',
   DatabaseSelector = 'DatabaseSelector',
   SetupWizard = 'SetupWizard',
+  Login = 'Login',
 }
 
 type LicenseGateMode = 'activate' | 'authorize-db';
 
 const LICENSE_KEY = 'YTMG3-N6DKC-DKB77-7M9GH-8HVX7';
+const ACTIVATION_PASSWORD = '65102984';
 
 const LICENSE_CFG = {
   expiresAt: 'license.expiresAt',
+  lastSeenAt: 'license.lastSeenAt',
 } as const;
 
 export default defineComponent({
   name: 'App',
   components: {
     Desk,
+    Login,
     SetupWizard,
     DatabaseSelector,
     WindowsTitleBar,
@@ -215,7 +276,9 @@ export default defineComponent({
         open: false,
         mode: 'activate' as LicenseGateMode,
         key: '',
+        password: '',
         days: 30,
+        hours: 0,
         error: '',
         canCancel: false,
         pendingAction: null as null | 'change-db',
@@ -229,7 +292,9 @@ export default defineComponent({
         open: boolean;
         mode: LicenseGateMode;
         key: string;
+        password: string;
         days: number;
+        hours: number;
         error: string;
         canCancel: boolean;
         pendingAction: null | 'change-db';
@@ -247,25 +312,32 @@ export default defineComponent({
     },
   },
   async mounted() {
-    await this.ensureLicenseGateOnStartup();
+    this.enforceLicenseGate();
     await this.setInitialScreen();
     // Apply Theme Settings (when SystemSettings is available)
-    const sys = fyo.singles.SystemSettings as any;
-    if (sys) {
-      applyThemeSettings(sys);
-      this.darkMode = (sys.themePreset || '').toString() === 'Dark';
+    const sys: unknown = fyo.singles.SystemSettings;
+    if (sys && typeof sys === 'object') {
+      const sysObj = sys as Record<string, unknown>;
+      applyThemeSettings(sys as ThemeSettingsLike);
+      const preset = sysObj['themePreset'];
+      this.darkMode =
+        (typeof preset === 'string' ? preset : String(preset ?? '')) === 'Dark';
     } else {
       // fallback
       setTheme('blue');
       this.darkMode = false;
     }
+
+    // Enforce license continuously (expiry + basic anti-tamper)
+    this.startLicenseWatcher();
   },
   methods: {
     getLicenseConfig() {
       const expiresAt = fyo.config.get(LICENSE_CFG.expiresAt, null) as string | null;
-      return { expiresAt };
+      const lastSeenAt = fyo.config.get(LICENSE_CFG.lastSeenAt, null) as string | null;
+      return { expiresAt, lastSeenAt };
     },
-    isExpired(expiresAt: string | null): boolean {
+    isExpired(expiresAt: string | null, nowTs: number = Date.now()): boolean {
       if (!expiresAt) {
         return true;
       }
@@ -273,7 +345,20 @@ export default defineComponent({
       if (Number.isNaN(ts)) {
         return true;
       }
-      return Date.now() > ts;
+      return nowTs > ts;
+    },
+    getNowOrDetectRollback(lastSeenAt: string | null): { nowTs: number; rolledBack: boolean } {
+      const nowTs = Date.now();
+      if (!lastSeenAt) {
+        return { nowTs, rolledBack: false };
+      }
+      const lastTs = Date.parse(lastSeenAt);
+      if (Number.isNaN(lastTs)) {
+        return { nowTs, rolledBack: false };
+      }
+      // If system time moves backwards significantly, treat as tampering.
+      const toleranceMs = 5 * 60 * 1000;
+      return { nowTs, rolledBack: nowTs + toleranceMs < lastTs };
     },
     openLicenseGate(
       mode: LicenseGateMode,
@@ -282,20 +367,64 @@ export default defineComponent({
       this.licenseGate.open = true;
       this.licenseGate.mode = mode;
       this.licenseGate.key = '';
+      this.licenseGate.password = '';
       this.licenseGate.error = '';
       this.licenseGate.canCancel = !!opts?.canCancel;
       this.licenseGate.pendingAction = opts?.pendingAction ?? null;
       if (mode === 'authorize-db') {
         this.licenseGate.days = 0;
+        this.licenseGate.hours = 0;
       } else if (!this.licenseGate.days || this.licenseGate.days < 1) {
         this.licenseGate.days = 30;
+        this.licenseGate.hours = this.licenseGate.hours ?? 0;
       }
     },
-    async ensureLicenseGateOnStartup(): Promise<void> {
-      const { expiresAt } = this.getLicenseConfig();
-      if (this.isExpired(expiresAt)) {
-        this.openLicenseGate('activate', { canCancel: false });
+    enforceLicenseGate(): void {
+      const { expiresAt, lastSeenAt } = this.getLicenseConfig();
+      const { nowTs, rolledBack } = this.getNowOrDetectRollback(lastSeenAt);
+
+      if (rolledBack) {
+        // Don't keep resetting the form while the user is typing.
+        if (!this.licenseGate.open || this.licenseGate.mode !== 'activate') {
+          this.openLicenseGate('activate', { canCancel: false });
+        } else {
+          this.licenseGate.canCancel = false;
+        }
+        this.licenseGate.error = 'تم اكتشاف تغيير في وقت النظام. الرجاء إعادة التفعيل.';
+        return;
       }
+
+      if (this.isExpired(expiresAt, nowTs)) {
+        // Don't keep resetting the form while the user is typing.
+        if (!this.licenseGate.open || this.licenseGate.mode !== 'activate') {
+          this.openLicenseGate('activate', { canCancel: false });
+        } else {
+          this.licenseGate.canCancel = false;
+        }
+        return;
+      }
+
+      // Periodically persist last seen time (best-effort)
+      const lastWrite = (this as any)._licenseLastWriteTs as number | undefined;
+      if (!lastWrite || nowTs - lastWrite > 60_000) {
+        (this as any)._licenseLastWriteTs = nowTs;
+        fyo.config.set(LICENSE_CFG.lastSeenAt, new Date(nowTs).toISOString());
+      }
+    },
+    startLicenseWatcher() {
+      this.stopLicenseWatcher();
+      const tick = () => this.enforceLicenseGate();
+      // check quickly for expiry without spamming disk writes
+      (this as any)._licenseWatcher = window.setInterval(tick, 1_000);
+      window.addEventListener('focus', tick);
+      document.addEventListener('visibilitychange', tick);
+    },
+    stopLicenseWatcher() {
+      const id = (this as any)._licenseWatcher as number | undefined;
+      if (typeof id === 'number') {
+        window.clearInterval(id);
+      }
+      (this as any)._licenseWatcher = undefined;
     },
     onLicenseGateClose() {
       // Do not allow closing when required
@@ -307,6 +436,7 @@ export default defineComponent({
     onLicenseGateCancel() {
       this.licenseGate.open = false;
       this.licenseGate.key = '';
+      this.licenseGate.password = '';
       this.licenseGate.error = '';
       this.licenseGate.pendingAction = null;
     },
@@ -327,14 +457,30 @@ export default defineComponent({
       }
 
       if (this.licenseGate.mode === 'activate') {
-        if (!this.licenseGate.days || this.licenseGate.days < 1) {
-          this.licenseGate.error = 'عدد الأيام يجب أن يكون 1 أو أكثر';
+        const password = (this.licenseGate.password ?? '').trim();
+        if (password !== ACTIVATION_PASSWORD) {
+          this.licenseGate.error = 'كلمة المرور غير صحيحة';
           return;
         }
-        const expiresAt = new Date(
-          Date.now() + this.licenseGate.days * 24 * 60 * 60 * 1000
-        ).toISOString();
+        const days = Number(this.licenseGate.days ?? 0);
+        const hours = Number(this.licenseGate.hours ?? 0);
+        if (!Number.isFinite(days) || days < 0) {
+          this.licenseGate.error = 'عدد الأيام يجب أن يكون 0 أو أكثر';
+          return;
+        }
+        if (!Number.isFinite(hours) || hours < 0 || hours > 23) {
+          this.licenseGate.error = 'عدد الساعات يجب أن يكون بين 0 و 23';
+          return;
+        }
+        const durationMs = days * 24 * 60 * 60 * 1000 + hours * 60 * 60 * 1000;
+        if (durationMs <= 0) {
+          this.licenseGate.error = 'يجب إدخال مدة تفعيل (أيام أو ساعات)';
+          return;
+        }
+        const nowTs = Date.now();
+        const expiresAt = new Date(nowTs + durationMs).toISOString();
         fyo.config.set(LICENSE_CFG.expiresAt, expiresAt);
+        fyo.config.set(LICENSE_CFG.lastSeenAt, new Date(nowTs).toISOString());
         this.licenseGate.open = false;
         return;
       }
@@ -365,10 +511,7 @@ export default defineComponent({
     },
     async setDesk(filePath: string): Promise<void> {
       await setLanguageMap();
-      this.activeScreen = Screen.Desk;
-      await this.setDeskRoute();
-      await fyo.telemetry.start(true);
-      await ipc.checkForUpdates();
+      await ensureDefaultAdminExists();
       this.dbPath = filePath;
       this.companyName = (await fyo.getValue(
         ModelNameEnum.AccountingSettings,
@@ -376,6 +519,14 @@ export default defineComponent({
       )) as string;
       await this.setSearcher();
       updateConfigFiles(fyo);
+      await this.setDeskRoute();
+      await fyo.telemetry.start(true);
+      await ipc.checkForUpdates();
+      // إذا كان هناك جلسة مستخدم محفوظة، انتقل مباشرة إلى Desk، وإلا أظهر شاشة تسجيل الدخول
+      this.activeScreen = isLoggedIn.value ? Screen.Desk : Screen.Login;
+    },
+    onLoggedIn(): void {
+      this.activeScreen = Screen.Desk;
     },
     newDatabase() {
       this.activeScreen = Screen.SetupWizard;
@@ -398,7 +549,7 @@ export default defineComponent({
         await this.showSetupWizardOrDesk(filePath);
       } catch (error) {
         await handleErrorWithDialog(error, undefined, true, true);
-        await this.showDbSelector();
+        this.showDbSelector();
       }
     },
     async setupComplete(setupWizardOptions: SetupWizardOptions): Promise<void> {
@@ -455,7 +606,7 @@ export default defineComponent({
       await this.setDesk(filePath);
     },
     async handleConnectionFailed(error: Error, actionSymbol: symbol) {
-      await this.showDbSelector();
+      this.showDbSelector();
 
       if (actionSymbol === dbErrorActionSymbols.CancelSelection) {
         return;
@@ -478,7 +629,7 @@ export default defineComponent({
 
       await routeTo(route);
     },
-    async showDbSelector(): Promise<void> {
+    showDbSelector(): void {
       const { expiresAt } = this.getLicenseConfig();
       // If expired -> force activation first.
       if (this.isExpired(expiresAt)) {

@@ -1,10 +1,10 @@
 import { t } from 'fyo';
-import { ValueError } from 'fyo/utils/errors';
 import { DateTime } from 'luxon';
 import {
   AccountRootType,
   AccountRootTypeEnum,
 } from 'models/baseModels/Account/types';
+import { isCredit } from 'models/helpers';
 import {
   AccountReport,
   ACC_BAL_WIDTH,
@@ -76,6 +76,7 @@ export class TrialBalance extends AccountReport {
       .filter((row) => !!(row.rootNodes && row.rootNodes.length));
 
     this.reportData = await this.getReportDataFromRows(rootTypeRows);
+    this.totalsRow = this._buildTotalsRow();
     this.loading = false;
   }
 
@@ -94,6 +95,83 @@ export class TrialBalance extends AccountReport {
     return reportData;
   }
 
+  _buildTotalsRow(): ReportRow | null {
+    if (!this.reportData?.length) {
+      return null;
+    }
+
+    // مجموعات الأعمدة بالترتيب:
+    // 0: اسم الحساب
+    // 1: Opening (Dr)  | 2: Opening (Cr)
+    // 3: Debit         | 4: Credit
+    // 5: Closing (Dr)  | 6: Closing (Cr)
+    let openingDebit = 0;
+    let openingCredit = 0;
+    let periodDebit = 0;
+    let periodCredit = 0;
+    let closingDebit = 0;
+    let closingCredit = 0;
+
+    for (const row of this.reportData) {
+      if (row.isGroup || row.isEmpty) {
+        continue;
+      }
+
+      const cells = row.cells;
+      if (cells.length < 7) {
+        continue;
+      }
+
+      const oDr = Number(cells[1].rawValue ?? 0);
+      const oCr = Number(cells[2].rawValue ?? 0);
+      const pDr = Number(cells[3].rawValue ?? 0);
+      const pCr = Number(cells[4].rawValue ?? 0);
+      const cDr = Number(cells[5].rawValue ?? 0);
+      const cCr = Number(cells[6].rawValue ?? 0);
+
+      openingDebit += oDr;
+      openingCredit += oCr;
+      periodDebit += pDr;
+      periodCredit += pCr;
+      closingDebit += cDr;
+      closingCredit += cCr;
+    }
+
+    const columns = this.getColumns();
+    const totalsByField: Record<string, number> = {
+      openingDebit,
+      openingCredit,
+      debit: periodDebit,
+      credit: periodCredit,
+      closingDebit,
+      closingCredit,
+    };
+
+    const cells: ReportCell[] = columns.map((col, index) => {
+      if (index === 0) {
+        return {
+          value: t`Total`,
+          rawValue: '',
+          align: 'left',
+          width: col.width ?? 1,
+          bold: true,
+        };
+      }
+
+      const sum = totalsByField[col.fieldname ?? ''];
+      const hasSum = typeof sum === 'number' && !Number.isNaN(sum);
+
+      return {
+        value: hasSum ? this.fyo.format(sum, 'Currency') : '',
+        rawValue: hasSum ? sum : '',
+        align: hasSum ? 'right' : (col.align ?? 'left'),
+        width: col.width ?? 1,
+      };
+    });
+
+    return { cells };
+  }
+
   // eslint-disable-next-line @typescript-eslint/require-await
   async _getGroupedByDateRanges(
     map: GroupedMap
@@ -109,9 +187,7 @@ export class TrialBalance extends AccountReport {
       for (const entry of map.get(account)!) {
         const key = this._getRangeMapKey(entry);
         if (key === null) {
-          throw new ValueError(
-            `invalid entry in trial balance ${entry.date?.toISOString() ?? ''}`
-          );
+          continue;
         }
 
         const map = valueMap.get(key);
@@ -124,10 +200,58 @@ export class TrialBalance extends AccountReport {
         });
       }
 
+      if (!this.accountMap) {
+        await this._setAndReturnAccountMap();
+      }
+
+      const openingRange = this._dateRanges![0];
+      const periodRange = this._dateRanges![1];
+      const closingRange = this._dateRanges![2];
+
+      const opening = valueMap.get(openingRange) ?? { debit: 0, credit: 0 };
+      const period = valueMap.get(periodRange) ?? { debit: 0, credit: 0 };
+
+      const accountInfo = this.accountMap![account];
+      if (accountInfo && !accountInfo.isGroup) {
+        const rootType = accountInfo.rootType;
+        const creditNature = isCredit(rootType);
+        const openingBalance = creditNature
+          ? opening.credit - opening.debit
+          : opening.debit - opening.credit;
+        const closingBalance = creditNature
+          ? openingBalance - period.debit + period.credit
+          : openingBalance + period.debit - period.credit;
+
+        const closingDebit = creditNature
+          ? (closingBalance < 0 ? -closingBalance : 0)
+          : (closingBalance >= 0 ? closingBalance : 0);
+        const closingCredit = creditNature
+          ? (closingBalance >= 0 ? closingBalance : 0)
+          : (closingBalance < 0 ? -closingBalance : 0);
+
+        valueMap.set(closingRange, {
+          debit: closingDebit,
+          credit: closingCredit,
+        });
+      }
+
       accountValueMap.set(account, valueMap);
     }
 
     return accountValueMap;
+  }
+
+  _getRangeMapKey(entry: LedgerEntry): DateRange | null {
+    const entryDate = DateTime.fromISO(
+      entry.date!.toISOString().split('T')[0]
+    ).toMillis();
+
+    const toDateMillis = DateTime.fromISO(this.toDate!).toMillis();
+    if (entryDate >= toDateMillis) {
+      return null;
+    }
+
+    return super._getRangeMapKey(entry);
   }
 
   async _getDateRanges(): Promise<DateRange[]> {

@@ -22,6 +22,12 @@ export function evaluateReadOnly(field: Field, doc?: Doc) {
     return true;
   }
 
+  if (doc?.schemaName === 'JournalEntryAccount') {
+    if (field.fieldname === 'debit' && doc.allowEditDebit === false) return true;
+    if (field.fieldname === 'credit' && doc.allowEditCredit === false) return true;
+    if (field.fieldname === 'account' && doc.allowEditAccount === false) return true;
+  }
+
   return evaluateFieldMeta(field, doc, 'readOnly');
 }
 

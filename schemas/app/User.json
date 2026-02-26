@@ -1,0 +1,78 @@
+{
+  "name": "User",
+  "label": "User",
+  "isAbstract": false,
+  "isSingle": false,
+  "isChild": false,
+  "isSubmittable": false,
+  "fields": [
+    {
+      "label": "ID",
+      "fieldname": "name",
+      "fieldtype": "Data",
+      "required": true,
+      "readOnly": true,
+      "hidden": true
+    },
+    {
+      "label": "Username",
+      "fieldname": "username",
+      "fieldtype": "Data",
+      "required": true,
+      "unique": true
+    },
+    {
+      "label": "Full Name",
+      "fieldname": "fullName",
+      "fieldtype": "Data"
+    },
+    {
+      "label": "Password Hash",
+      "fieldname": "passwordHash",
+      "fieldtype": "Data",
+      "hidden": true,
+      "required": true
+    },
+    {
+      "label": "Role",
+      "fieldname": "role",
+      "fieldtype": "Select",
+      "options": [
+        {
+          "value": "admin",
+          "label": "Admin"
+        },
+        {
+          "value": "user",
+          "label": "User"
+        }
+      ],
+      "default": "user",
+      "required": true
+    },
+    {
+      "label": "Permissions (JSON)",
+      "fieldname": "permissions",
+      "fieldtype": "Text",
+      "hidden": true
+    },
+    {
+      "label": "Allowed Interfaces (JSON)",
+      "fieldname": "allowedInterfaces",
+      "fieldtype": "Text",
+      "hidden": true
+    },
+    {
+      "label": "Is Active",
+      "fieldname": "isActive",
+      "fieldtype": "Check",
+      "default": true
+    },
+    {
+      "label": "Last Login At",
+      "fieldname": "lastLoginAt",
+      "fieldtype": "Datetime"
+    }
+  ],
+  "keywordFields": ["username", "fullName"]
+}

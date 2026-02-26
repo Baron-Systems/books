@@ -115,6 +115,14 @@
       "readOnly": false
     },
     {
+      "fieldname": "discountType",
+      "label": "Discount Type",
+      "fieldtype": "Select",
+      "options": ["Total", "PerUnit"],
+      "default": "Total",
+      "hidden": true
+    },
+    {
       "fieldname": "itemDiscountPercent",
       "label": "Discount Percent",
       "fieldtype": "Float",
@@ -147,7 +155,7 @@
       "readOnly": true
     }
   ],
-  "tableFields": ["item", "tax", "qty", "rate", "amount"],
+  "tableFields": ["item", "tax", "quantity", "transferQuantity", "transferUnit", "rate", "amount"],
   "keywordFields": ["item", "tax"],
   "quickEditFields": [
     "item",

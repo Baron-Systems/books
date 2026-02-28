@@ -40,15 +40,14 @@ import { toggleSidebar } from 'src/utils/ui';
         </router-view>
 
         <router-view v-slot="{ Component, route }" name="edit">
-          <Transition name="quickedit">
-            <div v-if="route?.query?.edit">
-              <component
-                :is="Component"
-                :key="route.query.schemaName + route.query.name"
-                :dark-mode="darkMode"
-              />
-            </div>
-          </Transition>
+          <Modal :open-modal="!!route?.query?.edit" @closemodal="$router.back()">
+            <component
+              v-if="route?.query?.edit"
+              :is="Component"
+              :key="route.query.schemaName + route.query.name"
+              :dark-mode="darkMode"
+            />
+          </Modal>
         </router-view>
       </div>
 
@@ -93,11 +92,13 @@ import { defineComponent } from 'vue';
 import { fyo } from 'src/initFyo';
 import { appDataRefreshNonce, requestAppDataRefresh } from 'src/utils/refs';
 import AppFooter from '../components/AppFooter.vue';
+import Modal from '../components/Modal.vue';
 import Sidebar from '../components/Sidebar.vue';
 export default defineComponent({
   name: 'Desk',
   components: {
     AppFooter,
+    Modal,
     Sidebar,
   },
   props: {
@@ -125,10 +126,32 @@ export default defineComponent({
       if (r.path.startsWith('/edit/') && r.params.schemaName) {
         return 'edit-' + String(r.params.schemaName);
       }
+
+      if (!this.shouldAutoRefreshRoute(r.path)) {
+        return r.fullPath;
+      }
+
       return `${r.fullPath}:${appDataRefreshNonce.value}`;
     },
   },
   methods: {
+    shouldAutoRefreshRoute(path: string): boolean {
+      if (path === '/') {
+        return true;
+      }
+
+      const refreshablePrefixes = [
+        '/list/',
+        '/report/',
+        '/print/',
+        '/report-print/',
+        '/chart-of-accounts',
+        '/users',
+        '/get-started',
+      ];
+
+      return refreshablePrefixes.some((prefix) => path.startsWith(prefix));
+    },
     setGlobalRefreshListeners() {
       this.clearGlobalRefreshListeners();
 

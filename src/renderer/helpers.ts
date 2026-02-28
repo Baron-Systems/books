@@ -22,6 +22,11 @@ export const outsideClickDirective: Directive<
 };
 
 function onDocumentClick(e: Event, el: HTMLElement, fn: OutsideClickCallback) {
+  // With KeepAlive, elements can be temporarily detached while component
+  // stays mounted; ignore outside-click logic for detached nodes.
+  if (!el.isConnected) {
+    return;
+  }
   const target = e.target as Node;
   if (el !== target && !el.contains(target)) {
     fn?.(e);

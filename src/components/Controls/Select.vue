@@ -87,7 +87,7 @@
             <li
               v-for="option in options"
               :key="option.value"
-              @click="selectOption(option)"
+              @click.stop="selectOption(option)"
               class="
                 p-1.5
                 rounded-md
@@ -133,6 +133,8 @@ export default defineComponent({
   data() {
     return {
       dropdownVisible: false,
+      selectId: '',
+      globalCloseListener: null as ((e: Event) => void) | null,
     };
   },
   props: {
@@ -140,6 +142,20 @@ export default defineComponent({
       type: Boolean,
       default: true,
     },
+  },
+  mounted() {
+    this.selectId = Math.random().toString(36).slice(2);
+    this.attachGlobalCloseListener();
+  },
+  activated() {
+    this.attachGlobalCloseListener();
+  },
+  deactivated() {
+    this.dropdownVisible = false;
+    this.detachGlobalCloseListener();
+  },
+  beforeUnmount() {
+    this.detachGlobalCloseListener();
   },
   computed: {
     options(): SelectOption[] {
@@ -164,6 +180,40 @@ export default defineComponent({
     },
   },
   methods: {
+    attachGlobalCloseListener() {
+      if (this.globalCloseListener) {
+        return;
+      }
+      this.globalCloseListener = (e: Event) => {
+        // Keep-alive can keep old views mounted but detached from DOM.
+        // Ignore global close events for detached controls.
+        if (!(this.$el as HTMLElement | undefined)?.isConnected) {
+          return;
+        }
+        const event = e as CustomEvent<{ except?: string }>;
+        if (event.detail?.except !== this.selectId) {
+          this.dropdownVisible = false;
+        }
+      };
+      document.addEventListener('close-all-popovers', this.globalCloseListener);
+    },
+    detachGlobalCloseListener() {
+      if (!this.globalCloseListener) {
+        return;
+      }
+      document.removeEventListener(
+        'close-all-popovers',
+        this.globalCloseListener
+      );
+      this.globalCloseListener = null;
+    },
+    dispatchCloseOthers() {
+      document.dispatchEvent(
+        new CustomEvent('close-all-popovers', {
+          detail: { except: this.selectId },
+        })
+      );
+    },
     onTriggerMouseDown(e: MouseEvent) {
       if (!this.isReadOnly) {
         e.preventDefault();
@@ -171,16 +221,21 @@ export default defineComponent({
     },
     toggleDropdown() {
       if (!this.closeDropDown) {
+        this.dispatchCloseOthers();
         this.dropdownVisible = true;
       } else if (!this.isReadOnly) {
-        this.dropdownVisible = !this.dropdownVisible;
+        const willOpen = !this.dropdownVisible;
+        if (willOpen) {
+          this.dispatchCloseOthers();
+        }
+        this.dropdownVisible = willOpen;
       }
     },
     selectOption(option: SelectOption) {
       this.triggerChange(option.value);
 
       if (this.closeDropDown) {
-        this.dropdownVisible = !this.dropdownVisible;
+        this.dropdownVisible = false;
       }
     },
   },

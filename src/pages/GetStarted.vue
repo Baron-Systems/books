@@ -47,7 +47,7 @@
               whitespace-nowrap
             "
             :type="item.action ? 'primary' : 'secondary'"
-            @click="handleAction(item)"
+            @pointerdown.left.stop="handleAction(item)"
           >
             <Icon :name="item.icon" size="18" class="shrink-0" />
             <span>{{ item.label }}</span>
@@ -116,7 +116,7 @@ export default defineComponent({
   methods: {
     async handleAction({ key, action }: ListItem) {
       if (action) {
-        action();
+        await action();
       }
 
       switch (key) {

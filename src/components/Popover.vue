@@ -68,7 +68,22 @@ export default {
     },
   },
   mounted() {
+    this._popoverId = Math.random().toString(36).slice(2);
+    this._isActive = true;
+    this._globalCloseListener = (e) => {
+      if (!this._isActive || !this.$el?.isConnected) {
+        return;
+      }
+      if (e?.detail?.except !== this._popoverId) {
+        this.close();
+      }
+    };
+    document.addEventListener('close-all-popovers', this._globalCloseListener);
+
     this.listener = (e) => {
+      if (!this._isActive || !this.$el?.isConnected) {
+        return;
+      }
       let $els = [this.$refs.reference, this.$refs.popover];
       let insideClick = $els.some(
         ($el) => $el && (e.target === $el || $el.contains(e.target))
@@ -79,12 +94,26 @@ export default {
       this.close();
     };
 
-    if (this.show == null) {
+    if (this.showPopup == null) {
       document.addEventListener('click', this.listener);
     }
   },
+  activated() {
+    this._isActive = true;
+  },
+  deactivated() {
+    this._isActive = false;
+    this.close();
+  },
   beforeUnmount() {
     this.popper && this.popper.destroy();
+    if (this._globalCloseListener) {
+      document.removeEventListener(
+        'close-all-popovers',
+        this._globalCloseListener
+      );
+      delete this._globalCloseListener;
+    }
     if (this.listener) {
       document.removeEventListener('click', this.listener);
       delete this.listener;
@@ -94,6 +123,7 @@ export default {
     setupPopper() {
       if (!this.popper) {
         this.popper = createPopper(this.$refs.reference, this.$refs.popover, {
+          strategy: 'fixed',
           placement: this.placement,
           modifiers: [{ name: 'offset', options: { offset: [0, 8] } }],
         });
@@ -116,6 +146,13 @@ export default {
       if (this.isOpen) {
         return;
       }
+
+      document.dispatchEvent(
+        new CustomEvent('close-all-popovers', {
+          detail: { except: this._popoverId },
+        })
+      );
+
       this.isOpen = true;
       nextTick(() => {
         this.setupPopper();

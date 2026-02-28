@@ -1,13 +1,13 @@
 <template>
   <div
     class="
-      border-s
-      dark:border-gray-800
-      h-full
-      overflow-auto
-      w-quick-edit
       bg-white
       dark:bg-gray-850
+      w-[28rem]
+      max-w-[92vw]
+      max-h-[80vh]
+      overflow-auto
+      rounded-lg
     "
   >
     <!-- Quick edit Tool bar -->

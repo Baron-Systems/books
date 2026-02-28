@@ -1,5 +1,6 @@
 <template>
   <button
+    :type="nativeType"
     class="rounded-md flex justify-center items-center text-sm"
     :disabled="disabled"
     :class="_class"
@@ -33,6 +34,10 @@ export default defineComponent({
     background: {
       type: Boolean,
       default: true,
+    },
+    nativeType: {
+      type: String,
+      default: 'button',
     },
   },
   computed: {

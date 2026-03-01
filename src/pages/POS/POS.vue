@@ -1097,29 +1097,20 @@ export default defineComponent({
         this.sinvDoc.date = new Date();
         await this.validate();
 
-        // Register-only: no popup, no new payment — only allocate existing party balance via _applyAutomaticBalanceAdjustment
-        if (!isPay) {
-          (this.sinvDoc as unknown as { __registerOnlyNoAutoPayment?: boolean }).__registerOnlyNoAutoPayment = true;
-        }
+        // POS flow should not auto-create payment on submit.
+        // Register: keep invoice without creating a new payment.
+        // Pay: create exactly one manual payment with selected method/amount.
+        (
+          this.sinvDoc as unknown as { __registerOnlyNoAutoPayment?: boolean }
+        ).__registerOnlyNoAutoPayment = true;
         await this.submitSinvDoc();
-        if (!isPay) {
-          delete (this.sinvDoc as unknown as { __registerOnlyNoAutoPayment?: boolean }).__registerOnlyNoAutoPayment;
-        }
+        delete (this.sinvDoc as unknown as {
+          __registerOnlyNoAutoPayment?: boolean;
+        }).__registerOnlyNoAutoPayment;
 
-        // Only cancel linked payments when we are about to create a new payment (Pay flow)
-        if (isPay) {
-          const paymentIds = await this.sinvDoc.getPaymentIds();
-          for (const paymentId of paymentIds) {
-            const paymentDoc = (await this.fyo.doc.getDoc(
-              ModelNameEnum.Payment,
-              paymentId
-            )) as Payment;
-            await paymentDoc.cancel();
-          }
-          if (paymentIds.length) {
-            await this.sinvDoc.load();
-          }
-        }
+        // POS flow creates manual payment explicitly (makePayment).
+        // Do not cancel linked payments here to avoid cancelling
+        // customer advances/credits auto-allocated on submit.
 
         const itemVisibility = await getItemVisibility(this.fyo);
 
